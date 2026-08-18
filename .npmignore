@@ -1,5 +1,5 @@
-# Published to npm (if/when published). The package has no build step: lib/ is
-# committed and shipped as-is. See package.json "files".
+# Files excluded from the tarball; keep in sync with package.json "files".
+# The package has no build step: lib/ is committed and shipped as-is.
 
 .git/
 .github/
