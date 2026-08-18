@@ -1,0 +1,43 @@
+name: Publish to npm
+
+# Only pushing a `v*` tag (e.g. v0.1.1) triggers a release.
+# Plain pushes to `main` never publish.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write # OIDC token required for npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+
+      - name: Syntax check
+        run: npm run check
+
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION=$(npm pkg get version | tr -d '"')
+          TAG_VERSION=${GITHUB_REF_NAME#v}
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match pushed tag ($TAG_VERSION). Expected v$PKG_VERSION."
+            exit 1
+          fi
+          echo "Publishing $PKG_VERSION"
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

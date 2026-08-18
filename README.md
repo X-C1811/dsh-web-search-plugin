@@ -95,6 +95,21 @@ node --check lib/client.js
 
 The client bundle must stay in the `window.__ModuleLoader__.load({ id, factory })` wire format — it is loaded by `dsh-client-modules`, not by a bundler. It must export **both** `apply` and `inject` (the array of cordis service names it reads: `slots`, `locale`, `connection`, `remote`, `settingsScope`) and register its card into the keyed `settings.plugin.item` slot with a `key`.
 
+## Publishing
+
+Releases are published automatically by GitHub Actions (`.github/workflows/publish.yml`): **pushing a `v*` tag** (e.g. `v0.1.1`) publishes the package to npm with provenance. Plain pushes to `main` never publish.
+
+1. Make sure `package.json` `version` matches the tag you are about to push (e.g. `0.1.1` → `v0.1.1`).
+2. On GitHub, set an npm automation token (publish permission) as the `NPM_TOKEN` repository secret under **Settings → Secrets and variables → Actions**, and allow workflow runs under **Settings → Actions**.
+3. Tag and push:
+
+   ```powershell
+   git tag v0.1.1
+   git push origin v0.1.1
+   ```
+
+The workflow verifies the tag against `package.json` `version` before publishing (`npm publish --provenance --access public`), so an accidental mismatch fails fast instead of shipping the wrong version. Users can then install with `dsh plugin --profile web add dsh-web-search-plugin`.
+
 ## Contributing
 
 Issues and pull requests are welcome. See the [issue tracker](https://github.com/X-C1811/dsh-web-search-plugin/issues) for known limitations and the roadmap; the provider is shaped so additional search APIs can be added beside Tavily.

@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.1] - 2026-08-19
 
+### Added
+
+- **GitHub Actions publishing** (`.github/workflows/publish.yml`): pushing a
+  `v*` tag publishes to npm with provenance; `ci.yml` runs the syntax checks
+  and a pack dry-run on every push/PR.
+
 ### Fixed
 
 - **Client bundle: missing `exports.inject`** (`lib/client.js`). The browser
