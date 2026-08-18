@@ -32,11 +32,35 @@ dsh plugin --profile web add dsh-web-search-plugin
 
 ### 从本地目录安装
 
+同盘可以用相对路径：
+
 ```powershell
-dsh plugin --profile web add "path/to/dsh-web-search-plugin"
+dsh plugin --profile web add ".\dsh-web-search-plugin"
 ```
 
-重启 DSH web 进程；浏览器刷新后会加载客户端 bundle。
+**Windows 跨盘不要 `dsh plugin add` 绝对路径。** Profile 在 `C:`、仓库在 `D:` 时，它会写成 `link:d:/...`；pnpm 把盘符当成相对路径，junction 会指到 `profiles\web\D:\...` 并链坏。也不要写 `file:D:/...`：pnpm 10 同样会把跨盘绝对路径拼进 profile 目录。
+
+正确做法是快照到与 profile **同盘**，再用 `file:`：
+
+```powershell
+$dst = "$env:USERPROFILE\.dsh\profiles\web\.local\dsh-web-search-plugin"
+New-Item -ItemType Directory -Force -Path $dst | Out-Null
+robocopy "D:\gddi\dsh-web-search-plugin" $dst /E /XD node_modules .git .github /NFL /NDL /NJH /NJS
+```
+
+在 profile 的 `package.json` 里：
+
+```json
+"dsh-web-search-plugin": "file:.local/dsh-web-search-plugin"
+```
+
+并保证 `dsh.profile.bundles` 含本包，然后：
+
+```powershell
+dsh plugin --profile web install
+```
+
+`file:` 是快照：改完仓库后要再 robocopy + `install` 并重启 DSH。
 
 用 `dsh --profile web --dump-config` 确认：组成树里应有 `dsh-web-search-plugin` 行，且 `web.searchProvider` 为 `dsh-web-search`。
 
@@ -55,7 +79,7 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 
 然后在 **设置 → 网页搜索** 里把引擎切到想要的提供方，即可继续使用对应的 API key。
 
-> **关于 `file:`（本地）安装** — pnpm 会把 `file:path` 依赖做成快照。改完本仓库后，需要再执行一次 `dsh plugin --profile web add "path/to/dsh-web-search-plugin"` 并重启。
+> **关于 `file:`（本地）安装** — pnpm 会把 `file:` 依赖做成快照。改完本仓库后，需要再同步快照并 `dsh plugin --profile web install`，然后重启。Windows 上 profile 与仓库不在同一盘时，用同盘 `file:.local/...`，不要 `link:` / `file:` 指向另一块盘。
 
 ## 配置
 
@@ -93,7 +117,7 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 
 - **Tavily keyless / DeepSeek 官方**：不展示额度条。前者是免费限流、没有账户配额；后者按次扣费、没有月度限额。
 - **Tavily keyed**：搜索时请求 `include_usage`，把本次 credits 累加到 `%DSH_HOME%\storages\dsh-web-search-usage.json`。Host 每 10 分钟（以及设置卡点刷新）调用 `GET /usage`，用 `account.current_plan` / `plan_limit` 做限额，用量取本地累计与远端的较大值。换套餐或远端用量回落会重置本地计数。
-- **Brave**：没有 usage 接口。每次搜索读取 `X-RateLimit-Limit/Remaining/Reset/Policy`，缓存月配额与重置时间。
+- **Brave**：没有 usage / 花费接口。控制台 **Capacity** 就是响应头里的每秒窗口（你这套是 50 次/秒）。月限额 `0` 表示不限请求次数，不是额度用完。计费 credits 只能看 [Brave API 控制台](https://api-dashboard.search.brave.com/)。
 - 浏览器只读 `GET /dsh-web-search/usage`（不直打上游）。进度条：剩余超过 20% 为绿色，不超过 20% 为黄色，不超过 10% 为红色。
 
 ## 切回内置 DeepSeek
