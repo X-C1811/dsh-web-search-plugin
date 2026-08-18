@@ -1,8 +1,8 @@
 name: CI
 
+# Pull requests only. Tag releases already run `npm run check` inside
+# publish.yml; a push to main must not start a second workflow.
 on:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:
