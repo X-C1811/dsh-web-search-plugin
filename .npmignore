@@ -1,5 +1,5 @@
 # Files excluded from the tarball; keep in sync with package.json "files".
-# The package has no build step: lib/ is committed and shipped as-is.
+# The package has no build step: lib/ and cordis.patch.yml are committed and shipped as-is.
 
 .git/
 .github/

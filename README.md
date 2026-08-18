@@ -1,119 +1,134 @@
 # dsh-web-search-plugin
 
-A [Tavily](https://tavily.com)-backed web search provider for the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web capability seam (`ctx.web`). It registers a `WebSearchProvider` under the stable id `tavily`, so the model-facing `web_search` tool runs against Tavily instead of the built-in DeepSeek search endpoint — with or without an API key.
+面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的 Tavily / [Brave Search](https://brave.com/search/api/) 搜索插件。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在设置卡里切换引擎即可，不必再改 `web.searchProvider`。
 
-- **Keyless mode (default)** — free and rate-limited; no account or API key required. Activated by a single `X-Tavily-Access-Mode: keyless` request header.
-- **Keyed mode** — uses a Tavily API key resolved from the `TAVILY_API_KEY` credential / launch-environment reference (or a literal `apiKey`), sent as a Bearer token.
-- **UI-configurable** — ships a configuration card in the DSH web settings (Settings → Plugins → Plugin configuration → Web search (Tavily)) to switch modes and edit options live.
+- **Tavily（默认）** — `keyless`（免费、限流、无需账号）或 `keyed`（`TAVILY_API_KEY`，Bearer token）。
+- **Brave Search** — `GET https://api.search.brave.com/res/v1/web/search`，请求头 `X-Subscription-Token`（凭据名 `BRAVE_API_KEY`）。一次搜索就是一次 HTTP 请求，不走模型轮次。
+- **不写自定义 session 事件** — 独立 Brave 插件每次调用都会写入 `web/brave-search-request`。该类型不在 DSH 的 `KNOWN_SESSION_EVENT_TYPES` 里，且 `Session.append` 无法加上 `ignorable: true`，冷加载会整段拒绝会话。本插件不会写这类信封。
 
-## Features
+## 特性
 
-- Implements the same provider contract as the official `@deepseek-ai/dsh-web-search-deepseek` plugin: `inject: ['web']` + `installSettingsSection` + `ctx.web.registerSearchProvider`.
-- Zero-config keyless search works out of the box; switch to an API key in one click for higher limits.
-- Normalizes Tavily's `answer` into the result `content` and `results[]` into citeable `sources[]` (url, title, snippet, published date), deduplicated by URL.
-- Settings section `dsh-web-search-plugin` is exposed dynamically through rc.7's `settings.describe()` — no host allowlist patch required.
-- Maps provider errors and caller cancellation to the seam's `WEB_PROVIDER_ERROR` / `WEB_ABORTED` codes; credentials are resolved per search, so a key stored or rotated in the web credentials domain applies to the next search without a restart.
+- 与官方 `@deepseek-ai/dsh-web-search-deepseek` 相同的提供方约定：`inject: ['web']` + `installSettingsSection` + `ctx.web.registerSearchProvider`。
+- Tavily keyless 无需密钥即可用；Brave 需要订阅 token（若本机已有 `BRAVE_API_KEY` 凭据，可直接复用）。
+- 各引擎结果都规范化为接缝的 `WebSearchResult`（可选 `content` + `sources[]`），按 URL 去重。
+- 设置段 `dsh-web-search-plugin` 通过 rc.7 的 `settings.describe()` 动态暴露，不需要宿主白名单补丁，也不需要自建回环 settings 桥。
+- 错误映射为 `WEB_PROVIDER_ERROR` / `WEB_ABORTED` / `WEB_PROVIDER_CREDENTIAL_MISSING`。
 
-## Requirements
+## 运行要求
 
-- DeepSeek Harness `0.1.0-rc.7` or newer (keyed plugin slots and dynamic settings exposure)
-- pnpm, for installing plugins into a profile via `dsh plugin`
+- DeepSeek Harness `0.1.0-rc.7` 或更新
+- pnpm，用于通过 `dsh plugin` 把插件装进 profile
 
-## Install
+## 安装
 
-### From npm
+本包是 **bundle**：`dsh.bundle.patch` + `cordis.patch.yml` 会插入 Host 行，并把 `web.searchProvider` 设为 `dsh-web-search`。没有这一声明时，`dsh plugin add` 只写入依赖，插件不会挂载。
+
+### 从 npm 安装
 
 ```powershell
 dsh plugin --profile web add dsh-web-search-plugin
 ```
 
-### From a local checkout
+### 从本地目录安装
 
 ```powershell
 dsh plugin --profile web add "path/to/dsh-web-search-plugin"
 ```
 
-Then route the web seam to the Tavily provider and enable the plugin in `%USERPROFILE%\.dsh\profiles\web\cordis.patch.yml`:
+重启 DSH web 进程；浏览器刷新后会加载客户端 bundle。
+
+用 `dsh --profile web --dump-config` 确认：组成树里应有 `dsh-web-search-plugin` 行，且 `web.searchProvider` 为 `dsh-web-search`。
+
+若 profile 已经覆盖了 `web`（例如旧包 `@dsh-ltctfer/dsh-web-search-brave` 留下的 `brave-official`），后打的 patch 仍会生效。请改指向本插件，并卸掉旧包：
 
 ```yaml
-# Replaces the base `web` config, which pins `searchProvider: deepseek-official`.
 - id: web
   name: '@deepseek-ai/dsh-web'
   config:
-    searchProvider: tavily
-
-- insert:
-    - id: dsh-web-search-plugin
-      name: dsh-web-search-plugin
-      config:
-        mode: keyless
+    searchProvider: dsh-web-search
 ```
-
-Restart the DSH web process; the browser picks up the plugin's client bundle on the next page refresh.
-
-> **Note on `file:` (local) installs** — pnpm treats a `file:path` dependency as a snapshot: changes made to the source directory are **not** propagated into the profile's `node_modules` automatically. After editing the plugin, re-run `dsh plugin --profile web add "path/to/dsh-web-search-plugin"` (or copy the files over) and restart.
-
-## Configuration
-
-The settings card (Settings → Plugins → Plugin configuration → Web search (Tavily)) edits the `dsh-web-search-plugin` namespace:
-
-| Key | Default | Meaning |
-|---|---|---|
-| `mode` | `keyless` | `keyless` (free, rate-limited) or `keyed` (Tavily API key) |
-| `apiKey` | — | Literal Tavily API key (never echoed back; stored via the credentials domain) |
-| `apiKeyEnv` | `TAVILY_API_KEY` | Credential/env reference resolved on each keyed search |
-| `baseURL` | `https://api.tavily.com` | Tavily REST base URL; `/search` is appended |
-| `maxResults` | `8` | Sources per search (1–20) |
-| `searchDepth` | `basic` | `basic` (faster) or `advanced` (deeper) |
-| `includeAnswer` | `true` | Request Tavily's generated answer; surfaced as the result `content` |
-| `topic` | `general` | `general` or `news` |
-
-Environment overrides: `DSH_WEB_SEARCH_PROVIDER=tavily` selects this provider at boot; the plugin's base URL falls back to `$TAVILY_BASE_URL` when `baseURL` is unset.
-
-## Switching back to the built-in search
-
-Change `searchProvider` back to `deepseek-official` in the profile patch. The plugin may stay registered; it is then simply not selected.
-
-## How it works
-
-- One `POST https://api.tavily.com/search` per search; keyless requests send `x-tavily-access-mode: keyless`, keyed requests send `authorization: Bearer <key>`.
-- Non-2xx responses become `WEB_PROVIDER_ERROR` (Tavily's `detail.error` text is preserved); caller cancellation becomes `WEB_ABORTED`.
-
-## Repository layout
-
-```
-lib/index.js    Host plugin: schemastery Config, TavilySearchProvider, settings section
-lib/client.js   Browser bundle (window.__ModuleLoader__.load): the configuration card
-```
-
-## Development
 
 ```powershell
-node --check lib/index.js
-node --check lib/client.js
+dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 ```
 
-The client bundle must stay in the `window.__ModuleLoader__.load({ id, factory })` wire format — it is loaded by `dsh-client-modules`, not by a bundler. It must export **both** `apply` and `inject` (the array of cordis service names it reads: `slots`, `locale`, `connection`, `remote`, `settingsScope`) and register its card into the keyed `settings.plugin.item` slot with a `key`.
+然后在「设置 → 插件 → 插件配置 → 网页搜索」里把引擎切到 Brave，即可继续使用已有的 `BRAVE_API_KEY`。
 
-## Publishing
+> **关于 `file:`（本地）安装** — pnpm 会把 `file:path` 依赖做成快照。改完本仓库后，需要再执行一次 `dsh plugin --profile web add "path/to/dsh-web-search-plugin"` 并重启。
 
-Releases are published automatically by GitHub Actions (`.github/workflows/publish.yml`): **pushing a `v*` tag** (e.g. `v0.1.1`) publishes the package to npm with provenance. Plain pushes to `main` never publish.
+## 配置
 
-1. Make sure `package.json` `version` matches the tag you are about to push (e.g. `0.1.1` → `v0.1.1`).
-2. On GitHub, set an npm automation token (publish permission) as the `NPM_TOKEN` repository secret under **Settings → Secrets and variables → Actions**, and allow workflow runs under **Settings → Actions**.
-3. Tag and push:
+设置卡编辑的是 `dsh-web-search-plugin` 命名空间：
+
+| 键 | 默认值 | 含义 |
+|---|---|---|
+| `provider` | `tavily` | `tavily` 或 `brave` |
+| `mode` | `keyless` | 仅 Tavily：`keyless` 或 `keyed` |
+| `apiKey` | — | Tavily API key 字面量（走凭据域，不会回显） |
+| `apiKeyEnv` | `TAVILY_API_KEY` | keyed Tavily 使用的凭据/环境变量名 |
+| `baseURL` | `https://api.tavily.com` | Tavily REST 基址；会再拼 `/search` |
+| `maxResults` | `8` | 每次搜索返回的源数量（1–20），两个引擎共用 |
+| `searchDepth` | `basic` | 仅 Tavily：`basic` 或 `advanced` |
+| `includeAnswer` | `true` | 仅 Tavily：请求生成摘要，写入结果 `content` |
+| `topic` | `general` | 仅 Tavily：`general` 或 `news` |
+| `braveApiKey` | — | Brave 订阅 token 字面量（走凭据域） |
+| `braveApiKeyEnv` | `BRAVE_API_KEY` | Brave 使用的凭据/环境变量名 |
+| `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | Brave 网页搜索接口 |
+| `country` | — | Brave 的 `country`（ISO 两位码，如 `cn`） |
+| `searchLang` | — | Brave 的 `search_lang`（如 `zh-hans`） |
+| `freshness` | — | Brave 的 `freshness`：`pd` / `pw` / `pm` / `py` |
+| `proxy` | — | Brave 使用的 HTTP(S) 代理；未填则回退 `HTTPS_PROXY` / `HTTP_PROXY` |
+
+环境变量：启动时 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` 会选中本接缝 id。未设置 `baseURL` 时，Tavily 基址回退 `$TAVILY_BASE_URL`。
+
+## 切回内置搜索
+
+在 profile 的 patch 里把 `searchProvider` 改回 `deepseek-official`。本插件可以继续挂着，只是不会被选中。
+
+## 工作方式
+
+- **Tavily** — `POST {baseURL}/search`。keyless 发送 `x-tavily-access-mode: keyless`；keyed 发送 `authorization: Bearer <key>`。
+- **Brave** — `GET {braveBaseURL}?q=&count=`，请求头 `x-subscription-token`。不向 session 追加自定义事件。
+- 非 2xx 映射为 `WEB_PROVIDER_ERROR`；调用方取消映射为 `WEB_ABORTED`。
+
+## 仓库布局
+
+```
+lib/index.js       Host 插件：Config、分发提供方、设置段
+lib/tavily.js      Tavily 后端
+lib/brave.js       Brave 后端（不写自定义 session 事件）
+lib/shared.js      中止 / 凭据解析辅助
+lib/client.js      浏览器 bundle：引擎切换 + 配置卡片
+cordis.patch.yml   Bundle patch：插入 Host 行，并把 searchProvider 设为 dsh-web-search
+```
+
+## 开发
+
+```powershell
+npm run check
+```
+
+客户端 bundle 必须保持 `window.__ModuleLoader__.load({ id, factory })` 线格式 — 由 `dsh-client-modules` 加载，不是打包器。必须同时导出 `apply` 和 `inject`（`slots`、`locale`、`connection`、`remote`、`settingsScope`），并以带 `key` 的方式把卡片注册进 keyed 的 `settings.plugin.item` slot。
+
+## 发布
+
+发布由 GitHub Actions（`.github/workflows/publish.yml`）自动完成：**推送 `v*` 标签**（例如 `v0.1.2`）会带 provenance 发到 npm。向 `main` 的普通推送不会发布。
+
+1. 确认 `package.json` 的 `version` 与即将推送的标签一致（例如 `0.1.2` → `v0.1.2`）。
+2. 在 GitHub **Settings → Secrets and variables → Actions** 里配置有 publish 权限的 npm automation token（仓库密钥 `NPM_TOKEN`），并允许 Actions 运行。
+3. 打标签并推送：
 
    ```powershell
-   git tag v0.1.1
-   git push origin v0.1.1
+   git tag v0.1.2
+   git push origin v0.1.2
    ```
 
-The workflow verifies the tag against `package.json` `version` before publishing (`npm publish --provenance --access public`), so an accidental mismatch fails fast instead of shipping the wrong version. Users can then install with `dsh plugin --profile web add dsh-web-search-plugin`.
+工作流会先核对标签与 `package.json` 的 `version`，再执行 `npm publish --provenance --access public`。
 
-## Contributing
+## 参与贡献
 
-Issues and pull requests are welcome. See the [issue tracker](https://github.com/X-C1811/dsh-web-search-plugin/issues) for known limitations and the roadmap; the provider is shaped so additional search APIs can be added beside Tavily.
+欢迎提 issue 和 pull request，见 [issue tracker](https://github.com/X-C1811/dsh-web-search-plugin/issues)。还可以在同一接缝 id 下继续加搜索后端。
 
-## License
+## 许可证
 
 [MIT](LICENSE)

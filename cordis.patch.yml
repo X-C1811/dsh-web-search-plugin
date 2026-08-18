@@ -1,0 +1,20 @@
+# Bundle layer applied by `dsh plugin add` once this package is a profile
+# dependency. Without this file (and package.json `dsh.bundle.patch`), DSH
+# installs the package as a plain library: no loader row, no Host apply, no
+# `/plugins/<name>/client.js`.
+#
+# `searchProvider` is restated in full because a Cordis patch replaces the
+# targeted row's whole `config`. The profile's own cordis.patch.yml still
+# wins if it later overrides `web`. The seam id is `dsh-web-search`; Tavily
+# vs Brave is the plugin's own `provider` setting, not a second web patch.
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    searchProvider: dsh-web-search
+
+- insert:
+    - id: dsh-web-search-plugin
+      name: dsh-web-search-plugin
+      config:
+        provider: tavily
+        mode: keyless
