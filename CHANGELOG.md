@@ -2,6 +2,18 @@
 
 本项目的重要变更都记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.2.0] - 2026-08-19
+
+### 新增
+
+- **DeepSeek（官方）后端**（`lib/deepseek.js`）。设置项 `provider: deepseek-official` 走 DeepSeek 的 Anthropic 兼容 Messages API（原生 `web_search_20250305` 工具，凭据名 `DEEPSEEK_API_KEY`）。bundle 层顺带禁用内置 `web-search-deepseek` Host 插件，从而移除旧的「插件 → 网页搜索」卡片、避免重复注册 provider。
+- **顶层「设置 → 网页搜索」分区**。配置入口从「设置 → 插件 → 插件配置」里的 keyed 卡片改为 `settings.section`（id `web-search`）——与「插件」分区同级，一张卡内切换 DeepSeek / Tavily / Brave，并各自展开对应配置项（模型、API 版本、max tokens / max uses 等）。
+
+### 变更
+
+- `provider` 取值扩展为 `deepseek-official` / `tavily`（默认）/ `brave`；接缝 id 仍为 `dsh-web-search`。
+- 新增 `lib/deepseek.js`；`package.json` 版本号 bump 到 `0.2.0`，`check` 脚本纳入新文件。
+
 ## [0.1.2] - 2026-08-18
 
 ### 新增
@@ -44,6 +56,7 @@
 - Keyless 模式（`X-Tavily-Access-Mode: keyless`）与 keyed 模式（通过 `TAVILY_API_KEY` 凭据引用发送 Bearer token）。
 - DSH 插件配置页上的浏览器设置卡片。
 
+[0.2.0]: https://github.com/X-C1811/dsh-web-search-plugin/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/X-C1811/dsh-web-search-plugin/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/X-C1811/dsh-web-search-plugin/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/X-C1811/dsh-web-search-plugin/releases/tag/v0.1.0

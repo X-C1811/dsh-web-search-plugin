@@ -1,7 +1,7 @@
 {
   "name": "dsh-web-search-plugin",
-  "version": "0.1.2",
-  "description": "Tavily and Brave Search providers for the DeepSeek Harness web capability seam (ctx.web): switch engines from the settings card without a custom session event",
+  "version": "0.2.0",
+  "description": "Unified web search for the DeepSeek Harness seam (ctx.web): DeepSeek (official), Tavily, and Brave backends with an in-browser selector",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -53,7 +53,7 @@
     }
   },
   "scripts": {
-    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/shared.js && node --check lib/tavily.js && node --check lib/brave.js"
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/shared.js && node --check lib/tavily.js && node --check lib/brave.js && node --check lib/deepseek.js"
   },
   "dependencies": {
     "undici": "^6.21.0"

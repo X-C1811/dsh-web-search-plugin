@@ -5,12 +5,18 @@
 #
 # `searchProvider` is restated in full because a Cordis patch replaces the
 # targeted row's whole `config`. The profile's own cordis.patch.yml still
-# wins if it later overrides `web`. The seam id is `dsh-web-search`; Tavily
-# vs Brave is the plugin's own `provider` setting, not a second web patch.
+# wins if it later overrides `web`. The seam id is `dsh-web-search`; the
+# backend (DeepSeek / Tavily / Brave) is the plugin's own `provider` setting.
 - id: web
   name: '@deepseek-ai/dsh-web'
   config:
     searchProvider: dsh-web-search
+
+# This plugin re-hosts the DeepSeek backend, so the in-box DeepSeek host
+# plugin is redundant: disabling it removes its `deepseek-official` provider
+# (no duplicate) and hides the legacy "Plugins → web search" card.
+- id: web-search-deepseek
+  disabled: true
 
 - insert:
     - id: dsh-web-search-plugin

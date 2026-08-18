@@ -1,10 +1,11 @@
 # dsh-web-search-plugin
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的 Tavily / [Brave Search](https://brave.com/search/api/) 搜索插件。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在设置卡里切换引擎即可，不必再改 `web.searchProvider`。
+面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的统一网页搜索插件，内置 **DeepSeek（官方）/ Tavily / [Brave Search](https://brave.com/search/api/) 三个后端**。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在设置卡里切换引擎即可，不必再改 `web.searchProvider`。
 
+- **DeepSeek（官方）** — 走 DeepSeek 的 Anthropic 兼容 Messages API（原生 `web_search_20250305` 工具，凭据名 `DEEPSEEK_API_KEY`），一次搜索消耗一个模型轮次。
 - **Tavily（默认）** — `keyless`（免费、限流、无需账号）或 `keyed`（`TAVILY_API_KEY`，Bearer token）。
 - **Brave Search** — `GET https://api.search.brave.com/res/v1/web/search`，请求头 `X-Subscription-Token`（凭据名 `BRAVE_API_KEY`）。一次搜索就是一次 HTTP 请求，不走模型轮次。
-- **不写自定义 session 事件** — 独立 Brave 插件每次调用都会写入 `web/brave-search-request`。该类型不在 DSH 的 `KNOWN_SESSION_EVENT_TYPES` 里，且 `Session.append` 无法加上 `ignorable: true`，冷加载会整段拒绝会话。本插件不会写这类信封。
+- **不写自定义 session 事件** — 工具结果已经走接缝自己的事件，无需多余信封。
 
 ## 特性
 
@@ -21,7 +22,7 @@
 
 ## 安装
 
-本包是 **bundle**：`dsh.bundle.patch` + `cordis.patch.yml` 会插入 Host 行，并把 `web.searchProvider` 设为 `dsh-web-search`。没有这一声明时，`dsh plugin add` 只写入依赖，插件不会挂载。
+本包是 **bundle**：`dsh.bundle.patch` + `cordis.patch.yml` 会插入 Host 行、把 `web.searchProvider` 设为 `dsh-web-search`，并**禁用内置 `web-search-deepseek` Host 插件**（本插件已自行托管 DeepSeek 后端，禁用它能移除旧的「插件 → 网页搜索」卡片、避免重复注册 provider）。没有这一声明时，`dsh plugin add` 只写入依赖，插件不会挂载。
 
 ### 从 npm 安装
 
@@ -52,7 +53,7 @@ dsh plugin --profile web add "path/to/dsh-web-search-plugin"
 dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 ```
 
-然后在「设置 → 插件 → 插件配置 → 网页搜索」里把引擎切到 Brave，即可继续使用已有的 `BRAVE_API_KEY`。
+然后在 **设置 → 网页搜索** 里把引擎切到想要的提供方，即可继续使用对应的 API key。
 
 > **关于 `file:`（本地）安装** — pnpm 会把 `file:path` 依赖做成快照。改完本仓库后，需要再执行一次 `dsh plugin --profile web add "path/to/dsh-web-search-plugin"` 并重启。
 
@@ -62,15 +63,22 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 
 | 键 | 默认值 | 含义 |
 |---|---|---|
-| `provider` | `tavily` | `tavily` 或 `brave` |
+| `provider` | `tavily` | `tavily`、`brave` 或 `deepseek-official` |
 | `mode` | `keyless` | 仅 Tavily：`keyless` 或 `keyed` |
 | `apiKey` | — | Tavily API key 字面量（走凭据域，不会回显） |
 | `apiKeyEnv` | `TAVILY_API_KEY` | keyed Tavily 使用的凭据/环境变量名 |
 | `baseURL` | `https://api.tavily.com` | Tavily REST 基址；会再拼 `/search` |
-| `maxResults` | `8` | 每次搜索返回的源数量（1–20），两个引擎共用 |
+| `maxResults` | `8` | 每次搜索返回的源数量（1–20），三个后端共用 |
 | `searchDepth` | `basic` | 仅 Tavily：`basic` 或 `advanced` |
 | `includeAnswer` | `true` | 仅 Tavily：请求生成摘要，写入结果 `content` |
 | `topic` | `general` | 仅 Tavily：`general` 或 `news` |
+| `deepseekApiKey` | — | DeepSeek API key 字面量（走凭据域） |
+| `deepseekApiKeyEnv` | `DEEPSEEK_API_KEY` | DeepSeek 使用的凭据/环境变量名 |
+| `deepseekBaseURL` | `https://api.deepseek.com/anthropic/v1` | DeepSeek Anthropic 兼容 Messages 基址；再拼 `/messages` |
+| `model` | `deepseek-v4-flash` | Anthropic 格式模型名 |
+| `apiVersion` | `2023-06-01` | `anthropic-version` 请求头 |
+| `maxTokens` | `4096` | Messages 请求生成 token 上限 |
+| `maxUses` | `5` | 每次请求 `web_search` 工具的最大调用次数 |
 | `braveApiKey` | — | Brave 订阅 token 字面量（走凭据域） |
 | `braveApiKeyEnv` | `BRAVE_API_KEY` | Brave 使用的凭据/环境变量名 |
 | `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | Brave 网页搜索接口 |
@@ -81,12 +89,13 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 
 环境变量：启动时 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` 会选中本接缝 id。未设置 `baseURL` 时，Tavily 基址回退 `$TAVILY_BASE_URL`。
 
-## 切回内置搜索
+## 切回内置 DeepSeek
 
-在 profile 的 patch 里把 `searchProvider` 改回 `deepseek-official`。本插件可以继续挂着，只是不会被选中。
+DeepSeek 已并入本插件（`provider: deepseek-official`），无需切回。若确要恢复 DSH 内置的 DeepSeek host 插件，请在 profile patch 里去掉对 `web-search-deepseek` 的 `disabled` 并把 `searchProvider` 设回 `deepseek-official`；本插件可以继续挂着，只是不会被选中。
 
 ## 工作方式
 
+- **DeepSeek** — `POST {deepseekBaseURL}/messages`，请求头 `x-api-key` / `authorization: Bearer`，工具 `web_search_20250305`。
 - **Tavily** — `POST {baseURL}/search`。keyless 发送 `x-tavily-access-mode: keyless`；keyed 发送 `authorization: Bearer <key>`。
 - **Brave** — `GET {braveBaseURL}?q=&count=`，请求头 `x-subscription-token`。不向 session 追加自定义事件。
 - 非 2xx 映射为 `WEB_PROVIDER_ERROR`；调用方取消映射为 `WEB_ABORTED`。
@@ -95,11 +104,12 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 
 ```
 lib/index.js       Host 插件：Config、分发提供方、设置段
+lib/deepseek.js    DeepSeek 后端（Anthropic Messages + web_search_20250305）
 lib/tavily.js      Tavily 后端
 lib/brave.js       Brave 后端（不写自定义 session 事件）
 lib/shared.js      中止 / 凭据解析辅助
-lib/client.js      浏览器 bundle：引擎切换 + 配置卡片
-cordis.patch.yml   Bundle patch：插入 Host 行，并把 searchProvider 设为 dsh-web-search
+lib/client.js      浏览器 bundle：顶层「网页搜索」分区 + 引擎切换表单
+cordis.patch.yml   Bundle patch：插入 Host 行、设 searchProvider、禁用内置 deepseek
 ```
 
 ## 开发
@@ -108,19 +118,19 @@ cordis.patch.yml   Bundle patch：插入 Host 行，并把 searchProvider 设为
 npm run check
 ```
 
-客户端 bundle 必须保持 `window.__ModuleLoader__.load({ id, factory })` 线格式 — 由 `dsh-client-modules` 加载，不是打包器。必须同时导出 `apply` 和 `inject`（`slots`、`locale`、`connection`、`remote`、`settingsScope`），并以带 `key` 的方式把卡片注册进 keyed 的 `settings.plugin.item` slot。
+客户端 bundle 必须保持 `window.__ModuleLoader__.load({ id, factory })` 线格式 — 由 `dsh-client-modules` 加载，不是打包器。必须同时导出 `apply` 和 `inject`（`slots`、`locale`、`connection`、`remote`、`settingsScope`），并把分区注册进 `settings.section`（`id: "web-search"`）。
 
 ## 发布
 
-发布由 GitHub Actions（`.github/workflows/publish.yml`）自动完成：**推送 `v*` 标签**（例如 `v0.1.2`）会带 provenance 发到 npm。向 `main` 的普通推送不会发布。
+发布由 GitHub Actions（`.github/workflows/publish.yml`）自动完成：**推送 `v*` 标签**（例如 `v0.2.0`）会带 provenance 发到 npm。向 `main` 的普通推送不会发布。
 
-1. 确认 `package.json` 的 `version` 与即将推送的标签一致（例如 `0.1.2` → `v0.1.2`）。
+1. 确认 `package.json` 的 `version` 与即将推送的标签一致（例如 `0.2.0` → `v0.2.0`）。
 2. 在 GitHub **Settings → Secrets and variables → Actions** 里配置有 publish 权限的 npm automation token（仓库密钥 `NPM_TOKEN`），并允许 Actions 运行。
 3. 打标签并推送：
 
    ```powershell
-   git tag v0.1.2
-   git push origin v0.1.2
+   git tag v0.2.0
+   git push origin v0.2.0
    ```
 
 工作流会先核对标签与 `package.json` 的 `version`，再执行 `npm publish --provenance --access public`。
