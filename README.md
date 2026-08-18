@@ -23,6 +23,9 @@ Tavily-backed search provider plugin for the [DeepSeek Harness](https://github.c
 
 From the machine where DSH runs:
 
+> The repository root is the plugin package root — for a local install, point
+> `dsh plugin` at the checkout directory itself.
+
 ```powershell
 dsh plugin --profile web add "path/to/dsh-web-search-plugin"   # local checkout
 # or once published:  dsh plugin --profile web add dsh-web-search-plugin
