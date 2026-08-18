@@ -29,9 +29,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - No longer requires the `dsh-host-apiproxy` settings-namespace allowlist
   patch that rc.6 needed: rc.7's `settings.describe()` exposes registered
   namespaces dynamically.
-- **Package renamed to `dsh-web-search-plugin`** (matching the repository name)
-  ahead of its first npm publish; the plugin id, settings namespace and card
-  key remain `web-search-tavily`.
+- **Package renamed to `dsh-web-search-plugin`** to match the repository name.
+  The plugin id, settings namespace and card key remain `web-search-tavily`.
 
 ## [0.1.0] - 2026-08-19
 
