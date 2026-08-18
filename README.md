@@ -1,4 +1,4 @@
-# web-search-tavily
+# dsh-web-search-plugin
 
 Tavily-backed search provider plugin for the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web capability seam (`ctx.web`). It registers a `WebSearchProvider` under the stable id `tavily`, so the model-facing `web_search` tool runs against [Tavily](https://tavily.com) instead of the DeepSeek search endpoint.
 
@@ -24,8 +24,8 @@ Tavily-backed search provider plugin for the [DeepSeek Harness](https://github.c
 From the machine where DSH runs:
 
 ```powershell
-dsh plugin --profile web add "path/to/web-search-tavily"   # local checkout
-# or once published:  dsh plugin --profile web add web-search-tavily
+dsh plugin --profile web add "path/to/dsh-web-search-plugin"   # local checkout
+# or once published:  dsh plugin --profile web add dsh-web-search-plugin
 ```
 
 Then add to `%USERPROFILE%\.dsh\profiles\web\cordis.patch.yml`:
@@ -40,7 +40,7 @@ Then add to `%USERPROFILE%\.dsh\profiles\web\cordis.patch.yml`:
 
 - insert:
     - id: web-search-tavily
-      name: web-search-tavily
+      name: dsh-web-search-plugin
       config:
         mode: keyless
 ```
@@ -51,7 +51,7 @@ next page refresh.
 > **Note on `file:` dependencies** — pnpm treats a `file:path` dependency as a
 > snapshot: changes to the source directory are **not** propagated to the
 > profile's `node_modules` automatically. After editing the plugin, re-run
-> `dsh plugin --profile web add "path/to/web-search-tavily"` (or copy the files
+> `dsh plugin --profile web add "path/to/dsh-web-search-plugin"` (or copy the files
 > over) and restart.
 
 ## Configuration

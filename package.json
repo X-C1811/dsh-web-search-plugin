@@ -1,7 +1,7 @@
 {
-  "name": "web-search-tavily",
+  "name": "dsh-web-search-plugin",
   "version": "0.1.1",
-  "description": "Tavily-backed search provider (keyless or API key) for the DeepSeek Harness web capability seam (ctx.web)",
+  "description": "Tavily web-search provider for the DeepSeek Harness web capability seam (ctx.web): keyless or API-key modes with a UI config card; provider framework extensible to more search APIs",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -15,7 +15,8 @@
   "type": "module",
   "main": "lib/index.js",
   "files": [
-    "lib"
+    "lib",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=18"
@@ -53,5 +54,13 @@
     "@deepseek-ai/schemastery": "^3.18.1",
     "@deepseek-ai/cordis": "^4.0.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/X-C1811/dsh-web-search-plugin.git"
+  },
+  "homepage": "https://github.com/X-C1811/dsh-web-search-plugin",
+  "bugs": {
+    "url": "https://github.com/X-C1811/dsh-web-search-plugin/issues"
+  }
 }
