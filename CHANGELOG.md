@@ -2,6 +2,19 @@
 
 本项目的重要变更都记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.2.1] - 2026-08-18
+
+### 新增
+
+- 设置导航「网页搜索」补上地球 logo（与 dsh-credits 相同的 nav mask 做法）。
+- **Tavily keyed 额度**：搜索请求带 `include_usage`，把本次 credits 累加到本地高水位；每 10 分钟拉一次 `GET /usage`（计划名 / `plan_limit`），显示 `max(本地, 远端)`。换计划或远端用量回落视为新周期。
+- **Brave 额度**：从搜索响应的 `X-RateLimit-*` 解析月配额、剩余量和重置时间，写入本地缓存。
+- 设置卡在搜索引擎切换下方展示进度条（已用/剩余、重置时间、绿/黄/红提醒）。DeepSeek 官方与 Tavily keyless 不展示。
+
+### 修复
+
+- 保存按钮在「看起来可点、实际 disabled」时没有反馈。现在始终可点（只读或保存中除外），成功/无变更/失败都会弹出 toast，对齐 dsh-credits。
+
 ## [0.2.0] - 2026-08-19
 
 ### 新增
@@ -56,6 +69,7 @@
 - Keyless 模式（`X-Tavily-Access-Mode: keyless`）与 keyed 模式（通过 `TAVILY_API_KEY` 凭据引用发送 Bearer token）。
 - DSH 插件配置页上的浏览器设置卡片。
 
+[0.2.1]: https://github.com/X-C1811/dsh-web-search-plugin/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/X-C1811/dsh-web-search-plugin/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/X-C1811/dsh-web-search-plugin/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/X-C1811/dsh-web-search-plugin/compare/v0.1.0...v0.1.1

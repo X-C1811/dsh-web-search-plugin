@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-search-plugin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Unified web search for the DeepSeek Harness seam (ctx.web): DeepSeek (official), Tavily, and Brave backends with an in-browser selector",
   "keywords": [
     "dsh-plugin",
@@ -53,7 +53,7 @@
     }
   },
   "scripts": {
-    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/shared.js && node --check lib/tavily.js && node --check lib/brave.js && node --check lib/deepseek.js"
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/shared.js && node --check lib/tavily.js && node --check lib/brave.js && node --check lib/deepseek.js && node --check lib/usage.js"
   },
   "dependencies": {
     "undici": "^6.21.0"

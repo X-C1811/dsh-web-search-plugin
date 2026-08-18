@@ -89,6 +89,13 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 
 环境变量：启动时 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` 会选中本接缝 id。未设置 `baseURL` 时，Tavily 基址回退 `$TAVILY_BASE_URL`。
 
+## 额度
+
+- **Tavily keyless / DeepSeek 官方**：不展示额度条。前者是免费限流、没有账户配额；后者按次扣费、没有月度限额。
+- **Tavily keyed**：搜索时请求 `include_usage`，把本次 credits 累加到 `%DSH_HOME%\storages\dsh-web-search-usage.json`。Host 每 10 分钟（以及设置卡点刷新）调用 `GET /usage`，用 `account.current_plan` / `plan_limit` 做限额，用量取本地累计与远端的较大值。换套餐或远端用量回落会重置本地计数。
+- **Brave**：没有 usage 接口。每次搜索读取 `X-RateLimit-Limit/Remaining/Reset/Policy`，缓存月配额与重置时间。
+- 浏览器只读 `GET /dsh-web-search/usage`（不直打上游）。进度条：剩余超过 20% 为绿色，不超过 20% 为黄色，不超过 10% 为红色。
+
 ## 切回内置 DeepSeek
 
 DeepSeek 已并入本插件（`provider: deepseek-official`），无需切回。若确要恢复 DSH 内置的 DeepSeek host 插件，请在 profile patch 里去掉对 `web-search-deepseek` 的 `disabled` 并把 `searchProvider` 设回 `deepseek-official`；本插件可以继续挂着，只是不会被选中。
@@ -103,12 +110,13 @@ DeepSeek 已并入本插件（`provider: deepseek-official`），无需切回。
 ## 仓库布局
 
 ```
-lib/index.js       Host 插件：Config、分发提供方、设置段
+lib/index.js       Host 插件：Config、分发提供方、设置段、额度路由
 lib/deepseek.js    DeepSeek 后端（Anthropic Messages + web_search_20250305）
-lib/tavily.js      Tavily 后端
-lib/brave.js       Brave 后端（不写自定义 session 事件）
+lib/tavily.js      Tavily 后端（keyed 时带 include_usage）
+lib/brave.js       Brave 后端（解析 X-RateLimit-*，不写自定义 session 事件）
+lib/usage.js       Tavily/Brave 用量本地缓存与 /usage 对账
 lib/shared.js      中止 / 凭据解析辅助
-lib/client.js      浏览器 bundle：顶层「网页搜索」分区 + 引擎切换表单
+lib/client.js      浏览器 bundle：顶层「网页搜索」分区 + 引擎切换 + 额度条
 cordis.patch.yml   Bundle patch：插入 Host 行、设 searchProvider、禁用内置 deepseek
 ```
 
