@@ -1,16 +1,18 @@
 # dsh-web-search-plugin
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的统一网页搜索插件，内置 **DeepSeek（官方）/ Tavily / [Brave Search](https://brave.com/search/api/) 三个后端**。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在设置卡里切换引擎即可，不必再改 `web.searchProvider`。
+面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的统一网页搜索插件，内置 **DeepSeek（官方）/ Tavily / [Brave Search](https://brave.com/search/api/) 三个后端**。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在 **设置 → 网页搜索** 里切换引擎即可，不必再改 `web.searchProvider`。
 
 - **DeepSeek（官方）** — 走 DeepSeek 的 Anthropic 兼容 Messages API（原生 `web_search_20250305` 工具，凭据名 `DEEPSEEK_API_KEY`），一次搜索消耗一个模型轮次。
-- **Tavily（默认）** — `keyless`（免费、限流、无需账号）或 `keyed`（`TAVILY_API_KEY`，Bearer token）。
-- **Brave Search** — `GET https://api.search.brave.com/res/v1/web/search`，请求头 `X-Subscription-Token`（凭据名 `BRAVE_API_KEY`）。一次搜索就是一次 HTTP 请求，不走模型轮次。
+- **Tavily（默认）** — `keyless`（免费、限流、无需账号）或 `keyed`（`TAVILY_API_KEY`，Bearer token）。keyed 会在设置卡显示额度进度条。
+- **Brave Search** — `GET https://api.search.brave.com/res/v1/web/search`，请求头 `X-Subscription-Token`（凭据名 `BRAVE_API_KEY`）。一次搜索就是一次 HTTP 请求，不走模型轮次；设置卡按响应头展示 Capacity / 月配额。
 - **不写自定义 session 事件** — 工具结果已经走接缝自己的事件，无需多余信封。
 
 ## 特性
 
 - 与官方 `@deepseek-ai/dsh-web-search-deepseek` 相同的提供方约定：`inject: ['web']` + `installSettingsSection` + `ctx.web.registerSearchProvider`。
+- 顶层 **设置 → 网页搜索** 分区：两列布局、未保存草稿、保存 toast；结果数量为 1–20 下拉。
 - Tavily keyless 无需密钥即可用；Brave 需要订阅 token（若本机已有 `BRAVE_API_KEY` 凭据，可直接复用）。
+- Tavily keyed / Brave 在设置卡展示额度进度条（DeepSeek 官方与 Tavily keyless 不展示）。
 - 各引擎结果都规范化为接缝的 `WebSearchResult`（可选 `content` + `sources[]`），按 URL 去重。
 - 设置段 `dsh-web-search-plugin` 通过 rc.7 的 `settings.describe()` 动态暴露，不需要宿主白名单补丁，也不需要自建回环 settings 桥。
 - 错误映射为 `WEB_PROVIDER_ERROR` / `WEB_ABORTED` / `WEB_PROVIDER_CREDENTIAL_MISSING`。
@@ -92,7 +94,7 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 | `apiKey` | — | Tavily API key 字面量（走凭据域，不会回显） |
 | `apiKeyEnv` | `TAVILY_API_KEY` | keyed Tavily 使用的凭据/环境变量名 |
 | `baseURL` | `https://api.tavily.com` | Tavily REST 基址；会再拼 `/search` |
-| `maxResults` | `8` | 每次搜索返回的源数量（1–20），三个后端共用 |
+| `maxResults` | `8` | 每次搜索返回的源数量，三个后端共用。设置卡为 1–20 下拉，超出上限会夹到 20 |
 | `searchDepth` | `basic` | 仅 Tavily：`basic` 或 `advanced` |
 | `includeAnswer` | `true` | 仅 Tavily：请求生成摘要，写入结果 `content` |
 | `topic` | `general` | 仅 Tavily：`general` 或 `news` |
@@ -106,10 +108,10 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 | `braveApiKey` | — | Brave 订阅 token 字面量（走凭据域） |
 | `braveApiKeyEnv` | `BRAVE_API_KEY` | Brave 使用的凭据/环境变量名 |
 | `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | Brave 网页搜索接口 |
-| `country` | — | Brave 的 `country`（ISO 两位码，如 `cn`） |
-| `searchLang` | — | Brave 的 `search_lang`（如 `zh-hans`） |
+| `country` | — | Brave 的 `country`（ISO 两位码，如 `cn`）；留空使用 Brave 默认 |
+| `searchLang` | — | Brave 的 `search_lang`（如 `zh-hans`）；留空使用 Brave 默认 |
 | `freshness` | — | Brave 的 `freshness`：`pd` / `pw` / `pm` / `py` |
-| `proxy` | — | Brave 使用的 HTTP(S) 代理；未填则回退 `HTTPS_PROXY` / `HTTP_PROXY` |
+| `proxy` | — | Brave 使用的 HTTP(S) 代理；留空回退 `HTTPS_PROXY` / `HTTP_PROXY` |
 
 环境变量：启动时 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` 会选中本接缝 id。未设置 `baseURL` 时，Tavily 基址回退 `$TAVILY_BASE_URL`。
 
@@ -117,7 +119,7 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 
 - **Tavily keyless / DeepSeek 官方**：不展示额度条。前者是免费限流、没有账户配额；后者按次扣费、没有月度限额。
 - **Tavily keyed**：搜索时请求 `include_usage`，把本次 credits 累加到 `%DSH_HOME%\storages\dsh-web-search-usage.json`。Host 每 10 分钟（以及设置卡点刷新）调用 `GET /usage`，用 `account.current_plan` / `plan_limit` 做限额，用量取本地累计与远端的较大值。换套餐或远端用量回落会重置本地计数。
-- **Brave**：没有 usage / 花费接口。控制台 **Capacity** 就是响应头里的每秒窗口（你这套是 50 次/秒）。月限额 `0` 表示不限请求次数，不是额度用完。计费 credits 只能看 [Brave API 控制台](https://api-dashboard.search.brave.com/)。
+- **Brave**：没有 usage / 花费接口。控制台 **Capacity** 就是响应头里的每秒窗口（例如 50 次/秒）。月限额 `0` 表示不限请求次数，不是额度用完。计费 credits 只能看 [Brave API 控制台](https://api-dashboard.search.brave.com/)。
 - 浏览器只读 `GET /dsh-web-search/usage`（不直打上游）。进度条：剩余超过 20% 为绿色，不超过 20% 为黄色，不超过 10% 为红色。
 
 ## 切回内置 DeepSeek
@@ -154,15 +156,15 @@ npm run check
 
 ## 发布
 
-发布由 GitHub Actions（`.github/workflows/publish.yml`）自动完成：**推送 `v*` 标签**（例如 `v0.2.0`）会带 provenance 发到 npm。向 `main` 的普通推送不会发布。
+发布由 GitHub Actions（`.github/workflows/publish.yml`）自动完成：**推送 `v*` 标签**（例如 `v0.2.1`）会带 provenance 发到 npm。向 `main` 的普通推送不会发布。
 
-1. 确认 `package.json` 的 `version` 与即将推送的标签一致（例如 `0.2.0` → `v0.2.0`）。
+1. 确认 `package.json` 的 `version` 与即将推送的标签一致（例如 `0.2.1` → `v0.2.1`）。
 2. 在 GitHub **Settings → Secrets and variables → Actions** 里配置有 publish 权限的 npm automation token（仓库密钥 `NPM_TOKEN`），并允许 Actions 运行。
 3. 打标签并推送：
 
    ```powershell
-   git tag v0.2.0
-   git push origin v0.2.0
+   git tag v0.2.1
+   git push origin v0.2.1
    ```
 
 工作流会先核对标签与 `package.json` 的 `version`，再执行 `npm publish --provenance --access public`。
