@@ -15,7 +15,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `inject = ["slots", "locale", "connection", "remote", "settingsScope"]`.
 - **Plugin-card slot registration** (`lib/client.js`). The card registered into
   `settings.plugin.item` with the rc.6 `id`/`order` shape; the slot is keyed
-  since rc.6+ and requires `key: "web-search-tavily"`.
+  since rc.6+ and requires `key: "dsh-web-search-plugin"`.
 - **`CardForm.field("apiKey")` crash** (`lib/client.js`). The write-only
   credential field has no section spec; `spec.format(...)` on `undefined`
   threw `Cannot read properties of undefined (reading 'format')` during the
@@ -29,15 +29,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - No longer requires the `dsh-host-apiproxy` settings-namespace allowlist
   patch that rc.6 needed: rc.7's `settings.describe()` exposes registered
   namespaces dynamically.
-- **Package renamed to `dsh-web-search-plugin`** to match the repository name.
-  The plugin id, settings namespace and card key remain `web-search-tavily`.
+- **Renamed to `dsh-web-search-plugin`**: the package name (matching the
+  repository name); the plugin id, settings namespace and card key were
+  renamed in lockstep so a single identity is used everywhere. No version
+  has shipped yet, so the rename carries no migration cost.
 
 ## [0.1.0] - 2026-08-19
 
 ### Added
 
 - Initial release: `TavilySearchProvider` (`id: "tavily"`) registered into
-  `ctx.web`, with `web-search-tavily` settings section.
+  `ctx.web`, with `dsh-web-search-plugin` settings section.
 - Keyless mode (`X-Tavily-Access-Mode: keyless`) and keyed mode
   (Bearer token via `TAVILY_API_KEY` credential reference).
 - Browser configuration card for the DSH plugin configuration surface.

@@ -11,7 +11,7 @@ A [Tavily](https://tavily.com)-backed web search provider for the [DeepSeek Harn
 - Implements the same provider contract as the official `@deepseek-ai/dsh-web-search-deepseek` plugin: `inject: ['web']` + `installSettingsSection` + `ctx.web.registerSearchProvider`.
 - Zero-config keyless search works out of the box; switch to an API key in one click for higher limits.
 - Normalizes Tavily's `answer` into the result `content` and `results[]` into citeable `sources[]` (url, title, snippet, published date), deduplicated by URL.
-- Settings section `web-search-tavily` is exposed dynamically through rc.7's `settings.describe()` — no host allowlist patch required.
+- Settings section `dsh-web-search-plugin` is exposed dynamically through rc.7's `settings.describe()` — no host allowlist patch required.
 - Maps provider errors and caller cancellation to the seam's `WEB_PROVIDER_ERROR` / `WEB_ABORTED` codes; credentials are resolved per search, so a key stored or rotated in the web credentials domain applies to the next search without a restart.
 
 ## Requirements
@@ -43,7 +43,7 @@ Then route the web seam to the Tavily provider and enable the plugin in `%USERPR
     searchProvider: tavily
 
 - insert:
-    - id: web-search-tavily
+    - id: dsh-web-search-plugin
       name: dsh-web-search-plugin
       config:
         mode: keyless
@@ -55,7 +55,7 @@ Restart the DSH web process; the browser picks up the plugin's client bundle on 
 
 ## Configuration
 
-The settings card (Settings → Plugins → Plugin configuration → Web search (Tavily)) edits the `web-search-tavily` namespace:
+The settings card (Settings → Plugins → Plugin configuration → Web search (Tavily)) edits the `dsh-web-search-plugin` namespace:
 
 | Key | Default | Meaning |
 |---|---|---|
