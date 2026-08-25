@@ -2,6 +2,22 @@
 
 本项目的重要变更都记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 新增
+
+- **内置 REST provider 元数据化**（`lib/providers.js` 静态表 + `lib/rest.js` 通用后端）：内置 REST 供应商由单一元数据表驱动，新增即"表里加一行 + 官方跳转链接"，零定制执行代码。
+  - 新增内置 provider：**Serper / SerpApi / Exa / SearXNG**（`provider` 值 `serper` / `serpapi` / `exa` / `searxng`）。
+  - 元数据字段：`method`（GET/POST）/ `queryIn`（query-string / body）/ `queryParam` / `countParam` / `params[]`（`when: always` / `nonEmpty` / `keyed` / `keyless`，受限谓词清单）/ `auth.type`（bearer / header / none / **query**）/ `response` / `hooks` / `officialUrl`。
+  - 通用后端 `RestSearchProvider` 接管 brave / tavily / serper / serpapi / exa / searxng；`deepseek-official`（模型工具型）仍走专用 `lib/deepseek.js`。
+  - Tavily 额度回传、Brave 限流头/代理作为可选 hook 注入，通用体不写死业务逻辑。
+  - 设置卡对需要 key 的内置 provider 渲染「获取 API key ↗」跳官方控制台；免 key 的（SearXNG / Tavily keyless）不渲染。
+
+### 变更
+
+- **默认引擎从 `tavily` 改为 `deepseek-official`**：schema 默认、服务端/客户端回退、bundle patch 初始值一致改为官方默认（已保存的显式 `provider` 不被覆盖）。
+- `provider` 取值扩展为 `tavily` / `brave` / `deepseek-official` / `serper` / `serpapi` / `exa` / `searxng`。
+
 ## [0.2.1] - 2026-08-18
 
 相对 0.2.0 的补丁：设置卡补上额度进度条、两列布局和输入校验，并收紧空态文案。

@@ -22,5 +22,5 @@
     - id: dsh-web-search-plugin
       name: dsh-web-search-plugin
       config:
-        provider: tavily
+        provider: deepseek-official
         mode: keyless
