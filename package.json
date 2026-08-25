@@ -53,7 +53,7 @@
     }
   },
   "scripts": {
-    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/shared.js && node --check lib/tavily.js && node --check lib/brave.js && node --check lib/deepseek.js && node --check lib/usage.js"
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/shared.js && node --check lib/custom.js && node --check lib/providers.js && node --check lib/rest.js && node --check lib/tavily.js && node --check lib/brave.js && node --check lib/deepseek.js && node --check lib/usage.js"
   },
   "dependencies": {
     "undici": "^6.21.0"
