@@ -16,3 +16,6 @@ Thumbs.db
 # Temp / scratch
 .tmp/
 .npm-cache/
+
+# Local-only design docs (kept on disk, not published to the remote)
+docs/
