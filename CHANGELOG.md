@@ -10,17 +10,11 @@
   - 鉴权方式模板 `auth`：`bearer`（默认，`Authorization: Bearer <key>`）/ `header`（`authHeader` 指定请求头名，如 `X-Subscription-Token`）/ `none`。
   - 响应形态模板 `response`：`tavily`（默认，`results[]`+`answer`）/ `brave`（`web.results[]`）/ `exa`（裸 `results[]`）。
   - 自定义供应商接入「搜索引擎」下拉框；配置落本机 settings，密钥走本机凭据域。
-- **内置 REST provider 元数据化**（`lib/providers.js` 静态表 + `lib/rest.js` 通用后端）：纯 REST 供应商改由单一元数据表驱动，新增即"表里加一行 + 官方跳转链接"，零定制执行代码。
-  - 新增内置 provider：**Serper / SerpApi / Exa / SearXNG**（`provider` 值 `serper` / `serpapi` / `exa` / `searxng`）。
-  - 元数据字段：`method`（GET/POST）/ `queryIn`（query-string / body）/ `queryParam` / `countParam` / `params[]`（`when: always` / `nonEmpty` / `keyed` / `keyless`，受限谓词清单）/ `auth.type`（bearer / header / none / **query**）/ `response` / `hooks` / `officialUrl`。
-  - 通用后端 `RestSearchProvider` 接管 brave / tavily / serper / serpapi / exa / searxng；`deepseek-official`（模型工具型）仍走专用 `lib/deepseek.js`。
-  - Tavily 额度回传、Brave 限流头/代理作为可选 hook 注入，通用体不写死业务逻辑。
-  - 设置卡对需要 key 的内置 provider 渲染「获取 API key ↗」跳官方控制台；免 key 的（SearXNG / Tavily keyless）不渲染。
 
 ### 变更
 
 - **默认引擎从 `tavily` 改为 `deepseek-official`**：schema 默认、服务端/客户端回退、bundle patch 初始值一致改为官方默认（已保存的显式 `provider` 不被覆盖）。
-- `provider` 取值扩展为 `tavily` / `brave` / `deepseek-official` / `serper` / `serpapi` / `exa` / `searxng` / 任意自定义 entry 的 `id`。
+- `provider` 取值扩展为 `tavily` / `brave` / `deepseek-official` / 任意自定义 entry 的 `id`。
 
 ## [0.2.1] - 2026-08-18
 

@@ -1,16 +1,11 @@
 # dsh-web-search-plugin
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的统一网页搜索插件，内置 **DeepSeek（官方，默认）/ Tavily / [Brave Search](https://brave.com/search/api/) / Serper / SerpApi / Exa / SearXNG 七个后端**，并支持**用户自定义任意数量的 REST 搜索供应商**（增删查改）。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在 **设置 → 网页搜索** 里切换引擎、管理自定义供应商即可，不必再改 `web.searchProvider`。
+面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的统一网页搜索插件，内置 **DeepSeek（官方，默认）/ Tavily / [Brave Search](https://brave.com/search/api/) 三个后端**，并支持**用户自定义任意数量的 REST 搜索供应商**（增删查改）。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在 **设置 → 网页搜索** 里切换引擎、管理自定义供应商即可，不必再改 `web.searchProvider`。
 
 - **DeepSeek（官方，默认）** — 走 DeepSeek 的 Anthropic 兼容 Messages API（原生 `web_search_20250305` 工具，凭据名 `DEEPSEEK_API_KEY`），一次搜索消耗一个模型轮次。
 - **Tavily** — `keyless`（免费、限流、无需账号）或 `keyed`（`TAVILY_API_KEY`，Bearer token）。keyed 会在设置卡显示额度进度条。
 - **Brave Search** — `GET https://api.search.brave.com/res/v1/web/search`，请求头 `X-Subscription-Token`（凭据名 `BRAVE_API_KEY`）。一次搜索就是一次 HTTP 请求，不走模型轮次；设置卡按响应头展示 Capacity / 月配额。
-- **Serper** — Google 结果（`POST /search`，头 `X-API-KEY`，凭据名 `SERPER_API_KEY`）。
-- **SerpApi** — `GET /search.json`，key 走 query（`api_key=`），凭据名 `SERPAPI_API_KEY`。
-- **Exa** — 语义/神经搜索（`POST /search`，Bearer，凭据名 `EXA_API_KEY`）。
-- **SearXNG** — 自建/协议免 key 的元搜索（`GET /search?format=json`），可填自托管实例地址。
 - **自定义供应商** — 用户可自建多个纯 REST 搜索后端：命名、凭据引用名、接口地址 + 可选鉴权方式 / 响应形态模板。配置落本机 settings，密钥走本机凭据域。
-- **官方 key 跳转** — 需要 key 的内置 provider 在设置卡带「获取 API key ↗」一键跳官方控制台；免 key 的（SearXNG / Tavily keyless）不渲染。
 - **不写自定义 session 事件** — 工具结果已经走接缝自己的事件，无需多余信封。
 
 ## 特性
@@ -48,12 +43,12 @@ dsh plugin --profile web add dsh-web-search-plugin
 
 | 键 | 默认值 | 含义 |
 |---|---|---|
-| `provider` | `deepseek-official` | `tavily`、`brave`、`deepseek-official`、`serper`、`serpapi`、`exa`、`searxng` 或某个自定义 entry 的 `id` |
+| `provider` | `deepseek-official` | `tavily`、`brave`、`deepseek-official` 或某个自定义 entry 的 `id` |
 | `mode` | `keyless` | 仅 Tavily：`keyless` 或 `keyed` |
 | `apiKey` | — | Tavily API key 字面量（走凭据域，不会回显） |
 | `apiKeyEnv` | `TAVILY_API_KEY` | keyed Tavily 使用的凭据/环境变量名 |
 | `baseURL` | `https://api.tavily.com` | Tavily REST 基址；会再拼 `/search` |
-| `maxResults` | `8` | 每次搜索返回的源数量，各后端共用。设置卡为 1–20 下拉，超出上限会夹到 20 |
+| `maxResults` | `8` | 每次搜索返回的源数量，三个后端共用。设置卡为 1–20 下拉，超出上限会夹到 20 |
 | `searchDepth` | `basic` | 仅 Tavily：`basic` 或 `advanced` |
 | `includeAnswer` | `true` | 仅 Tavily：请求生成摘要，写入结果 `content` |
 | `topic` | `general` | 仅 Tavily：`general` 或 `news` |
@@ -71,10 +66,6 @@ dsh plugin --profile web add dsh-web-search-plugin
 | `searchLang` | — | Brave 的 `search_lang`（如 `zh-hans`）；留空使用 Brave 默认 |
 | `freshness` | — | Brave 的 `freshness`：`pd` / `pw` / `pm` / `py` |
 | `proxy` | — | Brave 使用的 HTTP(S) 代理；留空回退 `HTTPS_PROXY` / `HTTP_PROXY` |
-| `serperApiKey` / `serperApiKeyEnv` / `serperBaseURL` | — / `SERPER_API_KEY` / — | Serper 的 key 字面量 / 凭据引用名 / 端点覆盖 |
-| `serpapiApiKey` / `serpapiApiKeyEnv` / `serpapiBaseURL` | — / `SERPAPI_API_KEY` / — | SerpApi 的 key 字面量 / 凭据引用名 / 端点覆盖 |
-| `exaApiKey` / `exaApiKeyEnv` / `exaBaseURL` | — / `EXA_API_KEY` / — | Exa 的 key 字面量 / 凭据引用名 / 端点覆盖 |
-| `searxngBaseURL` | — | SearXNG 自托管实例基址；留空用 `https://searx.be` |
 
 环境变量：启动时 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` 会选中本接缝 id。未设置 `baseURL` 时，Tavily 基址回退 `$TAVILY_BASE_URL`。
 
@@ -115,26 +106,22 @@ DeepSeek 已并入本插件（`provider: deepseek-official`），无需切回。
 ## 工作方式
 
 - **DeepSeek** — `POST {deepseekBaseURL}/messages`，请求头 `x-api-key` / `authorization: Bearer`，工具 `web_search_20250305`。
-- **纯 REST 类（Tavily / Brave / Serper / SerpApi / Exa / SearXNG）** — 由静态元数据表（`lib/providers.js`）+ 通用后端（`lib/rest.js`）驱动，无独立定制代码。请求方法 / 路径 / 查询字段名 / 鉴权（bearer / header / none / query）/ 固定参数 / 响应形态全部由表里的行决定。
-  - **Tavily** — `POST {baseURL}/search`。keyless 发送 `x-tavily-access-mode: keyless`；keyed 发送 `authorization: Bearer <key>`，并带 `include_usage` 回传 credits。
-  - **Brave** — `GET {braveBaseURL}?q=&count=`，请求头 `x-subscription-token`。不向 session 追加自定义事件。
-  - **Serper / SerpApi / Exa / SearXNG** — 按各自表的 `method` / `auth` / `params` 约定请求。
-- **自定义** — `POST {baseURL}/search`，鉴权按 `auth` 模板（`bearer` / `header` / `none`）；响应按「类」提示宽松解析（自动兼容 `organic` / `organic_results` / `web.results` / `results` 及字段别名）。
+- **Tavily** — `POST {baseURL}/search`。keyless 发送 `x-tavily-access-mode: keyless`；keyed 发送 `authorization: Bearer <key>`。
+- **Brave** — `GET {braveBaseURL}?q=&count=`，请求头 `x-subscription-token`。不向 session 追加自定义事件。
+- **自定义** — `POST {baseURL}/search`，鉴权按 `auth` 模板（`bearer` / `header` / `none`）；响应按「类」提示宽松解析（自动兼容 `organic` / `web.results` / `results` 及字段别名）。
 - 非 2xx 映射为 `WEB_PROVIDER_ERROR`；调用方取消映射为 `WEB_ABORTED`。
 
 ## 仓库布局
 
 ```
-lib/index.js       Host 插件：Config、按元数据分发提供方、设置段、额度路由、自定义路由
-lib/providers.js   静态元数据表：内置 REST provider 的请求/鉴权/响应/官方跳转（纯数据，无定制代码）
-lib/rest.js        通用 REST 后端：按元数据驱动请求构造与响应规范化（可选 hooks）
-lib/custom.js      通用 REST 后端的响应解析器 + 用户自建供应商
-lib/deepseek.js    DeepSeek 后端（Anthropic Messages + web_search_20250305，模型工具型专用）
-lib/tavily.js      Tavily 选项解析 / 响应映射（额度由 Tavorly hook 回传）
-lib/brave.js       Brave 选项解析 / 响应映射（解析 X-RateLimit-*）
+lib/index.js       Host 插件：Config、分发提供方、设置段、额度路由、自定义路由
+lib/custom.js      自定义 REST 搜索后端（可选鉴权 / 宽容响应解析）
+lib/deepseek.js    DeepSeek 后端（Anthropic Messages + web_search_20250305）
+lib/tavily.js      Tavily 后端（keyed 时带 include_usage）
+lib/brave.js       Brave 后端（解析 X-RateLimit-*，不写自定义 session 事件）
 lib/usage.js       Tavily/Brave 用量本地缓存与 /usage 对账
 lib/shared.js      中止 / 凭据解析辅助
-lib/client.js      浏览器 bundle：顶层「网页搜索」分区 + 引擎切换 + 官方 key 跳转 + 自定义供应商管理 + 额度条
+lib/client.js      浏览器 bundle：顶层「网页搜索」分区 + 引擎切换 + 自定义供应商管理 + 额度条
 cordis.patch.yml   Bundle patch：插入 Host 行、设 searchProvider、禁用内置 deepseek
 ```
 
