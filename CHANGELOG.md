@@ -2,21 +2,26 @@
 
 本项目的重要变更都记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [0.3.0] - 2026-08-25
 
 ### 新增
 
 - **内置 REST provider 元数据化**（`lib/providers.js` 静态表 + `lib/rest.js` 通用后端）：内置 REST 供应商由单一元数据表驱动，新增即"表里加一行 + 官方跳转链接"，零定制执行代码。
-  - 新增内置 provider：**Serper / SerpApi / Exa / SearXNG**（`provider` 值 `serper` / `serpapi` / `exa` / `searxng`）。
+  - 新增内置 provider：**Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl**（`provider` 值 `serper` / `serpapi` / `exa` / `searxng` / `scavio` / `firecrawl`）。
+  - Firecrawl 响应 `data.web[]` 走专用 `firecrawl` 解析分支；Scavio 复用 `organic_results` 解析。
+  - DuckDuckGo 无官方 API：下拉以禁用项提示经 SearXNG 使用，不提供独立后端。
   - 元数据字段：`method`（GET/POST）/ `queryIn`（query-string / body）/ `queryParam` / `countParam` / `params[]`（`when: always` / `nonEmpty` / `keyed` / `keyless`，受限谓词清单）/ `auth.type`（bearer / header / none / **query**）/ `response` / `hooks` / `officialUrl`。
-  - 通用后端 `RestSearchProvider` 接管 brave / tavily / serper / serpapi / exa / searxng；`deepseek-official`（模型工具型）仍走专用 `lib/deepseek.js`。
+  - 通用后端 `RestSearchProvider` 接管 brave / tavily / serper / serpapi / exa / searxng / scavio / firecrawl；`deepseek-official`（模型工具型）仍走专用 `lib/deepseek.js`。
   - Tavily 额度回传、Brave 限流头/代理作为可选 hook 注入，通用体不写死业务逻辑。
   - 设置卡对需要 key 的内置 provider 渲染「获取 API key ↗」跳官方控制台；免 key 的（SearXNG / Tavily keyless）不渲染。
 
 ### 变更
 
 - **默认引擎从 `tavily` 改为 `deepseek-official`**：schema 默认、服务端/客户端回退、bundle patch 初始值一致改为官方默认（已保存的显式 `provider` 不被覆盖）。
-- `provider` 取值扩展为 `tavily` / `brave` / `deepseek-official` / `serper` / `serpapi` / `exa` / `searxng`。
+- `provider` 取值扩展为 `tavily` / `brave` / `deepseek-official` / `serper` / `serpapi` / `exa` / `searxng` / `scavio` / `firecrawl`。
+- **修复 Tavily `include_answer` 类型错误**：`params[]` 布尔值不再强转字符串，请求体发真布尔（`true`/`false`），兼容 Tavily API 对 `include_answer` / `include_images` / `include_usage` 的类型要求。
+- **修复 SearXNG 卡片误显「获取 API key ↗」**：仅需要 key 的 provider 才显示获取 key 跳转，免 key 的（SearXNG / Tavily keyless）不显示。
+- **收紧未配置 key 的提示文案**：placeholder 缩短为「未配置密钥」，补充说明移至输入框下方提示，避免溢出。以下未纳入内置：TinyFish、Google CSE、SERPJET（官网不可访问）、DuckDuckGo（无官方 API，经 SearXNG 使用）。
 
 ## [0.2.1] - 2026-08-18
 

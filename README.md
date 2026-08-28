@@ -1,6 +1,6 @@
 # dsh-web-search-plugin
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的统一网页搜索插件，内置 **DeepSeek（官方，默认）/ Tavily / [Brave Search](https://brave.com/search/api/) / Serper / SerpApi / Exa / SearXNG 七个后端**。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在 **设置 → 网页搜索** 里切换引擎即可，不必再改 `web.searchProvider`。
+面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的统一网页搜索插件，内置 **DeepSeek（官方，默认）/ Tavily / [Brave Search](https://brave.com/search/api/) / Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl 九个后端**。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在 **设置 → 网页搜索** 里切换引擎即可，不必再改 `web.searchProvider`。
 
 - **DeepSeek（官方，默认）** — 走 DeepSeek 的 Anthropic 兼容 Messages API（原生 `web_search_20250305` 工具，凭据名 `DEEPSEEK_API_KEY`），一次搜索消耗一个模型轮次。
 - **Tavily** — `keyless`（免费、限流、无需账号）或 `keyed`（`TAVILY_API_KEY`，Bearer token）。keyed 会在设置卡显示额度进度条。
@@ -9,6 +9,9 @@
 - **SerpApi** — `GET /search.json`，key 走 query（`api_key=`），凭据名 `SERPAPI_API_KEY`。
 - **Exa** — 语义/神经搜索（`POST /search`，Bearer，凭据名 `EXA_API_KEY`）。
 - **SearXNG** — 自建/协议免 key 的元搜索（`GET /search?format=json`），可填自托管实例地址。
+- **Scavio** — Google SERP（`POST /api/v2/google`，Bearer，凭据名 `SCAVIO_API_KEY`），响应与 SerpApi 同构。
+- **Firecrawl** — 搜索+抓取（`POST /v2/search`，Bearer，凭据名 `FIRECRAWL_API_KEY`），`sources: ["web"]`。
+- **DuckDuckGo** — 无官方搜索 API，不提供独立后端；下拉中以禁用项提示：选 SearXNG 并指向聚合了 DuckDuckGo 的实例即可。
 - **官方 key 跳转** — 需要 key 的内置 provider 在设置卡带「获取 API key ↗」一键跳官方控制台；免 key 的（SearXNG / Tavily keyless）不渲染。
 - **不写自定义 session 事件** — 工具结果已经走接缝自己的事件，无需多余信封。
 
@@ -47,7 +50,7 @@ dsh plugin --profile web add dsh-web-search-plugin
 
 | 键 | 默认值 | 含义 |
 |---|---|---|
-| `provider` | `deepseek-official` | `tavily`、`brave`、`deepseek-official`、`serper`、`serpapi`、`exa` 或 `searxng` |
+| `provider` | `deepseek-official` | `tavily`、`brave`、`deepseek-official`、`serper`、`serpapi`、`exa`、`searxng`、`scavio` 或 `firecrawl` |
 | `mode` | `keyless` | 仅 Tavily：`keyless` 或 `keyed` |
 | `apiKey` | — | Tavily API key 字面量（走凭据域，不会回显） |
 | `apiKeyEnv` | `TAVILY_API_KEY` | keyed Tavily 使用的凭据/环境变量名 |
@@ -74,6 +77,19 @@ dsh plugin --profile web add dsh-web-search-plugin
 | `serpapiApiKey` / `serpapiApiKeyEnv` / `serpapiBaseURL` | — / `SERPAPI_API_KEY` / — | SerpApi 的 key 字面量 / 凭据引用名 / 端点覆盖 |
 | `exaApiKey` / `exaApiKeyEnv` / `exaBaseURL` | — / `EXA_API_KEY` / — | Exa 的 key 字面量 / 凭据引用名 / 端点覆盖 |
 | `searxngBaseURL` | — | SearXNG 自托管实例基址；留空用 `https://searx.be` |
+| `scavioApiKey` / `scavioApiKeyEnv` / `scavioBaseURL` | — / `SCAVIO_API_KEY` / — | Scavio 的 key 字面量 / 凭据引用名 / 端点覆盖 |
+| `firecrawlApiKey` / `firecrawlApiKeyEnv` / `firecrawlBaseURL` | — / `FIRECRAWL_API_KEY` / — | Firecrawl 的 key 字面量 / 凭据引用名 / 端点覆盖 |
+
+## 未纳入的服务
+
+以下服务**不内置**（在引擎下拉中不会出现，也不提供后端）：
+
+| 服务 | 不做的原因 |
+|---|---|
+| **TinyFish** | 免费额度极小（每分钟 5 次）；其 Search + Fetch 形态超出"纯 REST 搜索"边界，仅搜索部分价值低 |
+| **Google CSE** | 官方已对新用户关闭注册，并将于 2027-01-01 停用 |
+| **SERPJET** | 官网当前不可访问，暂不接入 |
+| **DuckDuckGo** | 无官方搜索 API（HTML/社区库抓取不符合元数据表"纯 REST"边界）。下拉中有禁用提示，指引经 SearXNG 使用 |
 
 环境变量：启动时 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` 会选中本接缝 id。未设置 `baseURL` 时，Tavily 基址回退 `$TAVILY_BASE_URL`。
 
@@ -177,15 +193,15 @@ npm run check
 
 ## 发布
 
-发布由 GitHub Actions（`.github/workflows/publish.yml`）自动完成：**推送 `v*` 标签**（例如 `v0.2.1`）会带 provenance 发到 npm。向 `main` 的普通推送不会发布。
+发布由 GitHub Actions（`.github/workflows/publish.yml`）自动完成：**推送 `v*` 标签**（例如 `v0.3.0`）会带 provenance 发到 npm。向 `main` 的普通推送不会发布。
 
-1. 确认 `package.json` 的 `version` 与即将推送的标签一致（例如 `0.2.1` → `v0.2.1`）。
+1. 确认 `package.json` 的 `version` 与即将推送的标签一致（例如 `0.3.0` → `v0.3.0`）。
 2. 在 GitHub **Settings → Secrets and variables → Actions** 里配置有 publish 权限的 npm automation token（仓库密钥 `NPM_TOKEN`），并允许 Actions 运行。
 3. 打标签并推送：
 
    ```powershell
-   git tag v0.2.1
-   git push origin v0.2.1
+   git tag v0.3.0
+   git push origin v0.3.0
    ```
 
 工作流会先核对标签与 `package.json` 的 `version`，再执行 `npm publish --provenance --access public`。

@@ -1,7 +1,7 @@
 {
   "name": "dsh-web-search-plugin",
-  "version": "0.2.1",
-  "description": "Unified web search for the DeepSeek Harness seam (ctx.web): DeepSeek (official), Tavily, and Brave backends with an in-browser selector",
+  "version": "0.3.0",
+  "description": "Unified web search for the DeepSeek Harness seam (ctx.web): DeepSeek (official), Tavily, Brave, Serper, SerpApi, Exa, SearXNG, Scavio, and Firecrawl backends",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
