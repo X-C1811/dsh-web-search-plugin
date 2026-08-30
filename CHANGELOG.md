@@ -2,6 +2,21 @@
 
 本项目的重要变更都记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.3.1] - 2026-08-30
+
+### 修复
+
+- **Tavily keyless 模式失效**：通用 REST 后端不再在 keyless 模式下强制解析 API key；无 key 时只发送 `x-tavily-access-mode: keyless`，可正常使用免费额度。
+- **POST 类 provider 的 count 参数类型错误**：Tavily `max_results`、Serper `num`、Exa `num_results`、Firecrawl `limit` 等在 JSON body 中恢复为数字，不再被强转字符串。
+- **Scavio / Firecrawl 设置卡严重卡死**：补齐浏览器端缺失的 `scavioApiKeyEnv` / `scavioBaseURL` / `firecrawlApiKeyEnv` / `firecrawlBaseURL` 表单字段与投影，修复切换后输入框无法输入、引擎无法切换的问题。
+- **Scavio / Firecrawl 默认凭据名错误**：未显式填写 keyEnv 时分别回退到 `SCAVIO_API_KEY` / `FIRECRAWL_API_KEY`，不再错误使用 `EXA_API_KEY`。
+- **Brave 环境代理回退丢失**：恢复 `HTTPS_PROXY` / `HTTP_PROXY` 环境变量回退，未显式配置 `proxy` 时也能按环境代理请求。
+- `User-Agent` 更新为 `0.3.1`。
+
+### 优化
+
+- 内置 REST 渠道（Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl）的 Base URL 默认值预填到设置卡，切换渠道后不再是空 URL。
+
 ## [0.3.0] - 2026-08-25
 
 ### 新增
