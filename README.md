@@ -17,19 +17,19 @@
 
 ## 特性
 
-- 与官方 `@deepseek-ai/dsh-web-search-deepseek` 相同的提供方约定：`inject: ['web']` + `installSettingsSection` + `ctx.web.registerSearchProvider`。
+- 与官方 `@deepseek-ai/dsh-web-search-deepseek` 相同的提供方约定：`inject: ['web']` + `ctx.settings.installSection` + `ctx.web.registerSearchProvider`。
 - 顶层 **设置 → 网页搜索** 分区：两列布局、未保存草稿、保存 toast；结果数量为 1–20 下拉。
 - **默认引擎为 DeepSeek（官方）**：新装 / 未显式改动时，搜索直接走 `deepseek-official`，不再依赖 keyless 的 Tavily。
 - 纯 REST 后端由**静态元数据表 + 通用后端**驱动，新增 provider 即"表里加一行 + 官方跳转链接"，无定制执行代码。
 - Tavily keyless 无需密钥即可用；Brave 需要订阅 token（若本机已有 `BRAVE_API_KEY` 凭据，可直接复用）。
 - Tavily keyed / Brave 在设置卡展示额度进度条（DeepSeek 官方与 Tavily keyless / 其余 REST 后端不展示）。
 - 各引擎结果都规范化为接缝的 `WebSearchResult`（可选 `content` + `sources[]`），按 URL 去重。
-- 设置段 `dsh-web-search-plugin` 通过 rc.7 的 `settings.describe()` 动态暴露，不需要宿主白名单补丁，也不需要自建回环 settings 桥。
+- 设置段 `dsh-web-search-plugin` 通过 dsh 的 `settings.installSection` 注册、由 `settings.describe()` 动态暴露，不需要宿主白名单补丁，也不需要自建回环 settings 桥。
 - 错误映射为 `WEB_PROVIDER_ERROR` / `WEB_ABORTED` / `WEB_PROVIDER_CREDENTIAL_MISSING`。
 
 ## 运行要求
 
-- DeepSeek Harness `0.1.0-rc.7` 或更新
+- DeepSeek Harness `0.1.2-alpha.4`（最新 main）或更新
 - pnpm，用于通过 `dsh plugin` 把插件装进 profile
 
 ## 安装
@@ -189,7 +189,7 @@ dsh plugin --profile web remove @dsh-ltctfer/dsh-web-search-brave
 npm run check
 ```
 
-客户端 bundle 必须保持 `window.__ModuleLoader__.load({ id, factory })` 线格式 — 由 `dsh-client-modules` 加载，不是打包器。必须同时导出 `apply` 和 `inject`（`slots`、`locale`、`connection`、`remote`、`settingsScope`），并把分区注册进 `settings.section`（`id: "web-search"`）。
+客户端 bundle 必须保持 `window.__ModuleLoader__.load({ id, factory })` 线格式 — 由 `dsh-client-modules` 加载，不是打包器。必须同时导出 `apply` 和 `inject`（`slots`、`locale`、`remote`、`settingsScope`），并把分区注册进 `settings.section`（`id: "web-search"`）。
 
 ## 发布
 

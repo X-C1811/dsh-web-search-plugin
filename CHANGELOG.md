@@ -2,6 +2,15 @@
 
 本项目的重要变更都记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 2026-09-02
+
+### 变更
+
+- **适配 DeepSeek Harness 最新 main（`0.1.2-alpha.4`）**：`@deepseek-ai/dsh-settings` 已移除顶层 `installSettingsSection` / `settingsNamespace`，Host 侧改为在 `ctx.inject(['settings'])` 后调用 `settingsCtx.settings.installSection(ctx, ...)`；settings namespace 直接使用普通字符串。
+- **浏览器端移除对 `@deepseek-ai/dsh-client-runtime` / 旧 `connection` 的依赖**：该包已不在最新 Harness workspace / 客户端模块表中。`createSnapshotStore` 改从平台常驻模块 `@deepseek-ai/dsh-client-store` 导入；`dsh.client.inject` 与客户端 `inject` 对齐为 `slots` / `locale` / `remote` / `settingsScope`。
+- **凭据远端接口迁移到 `ctx.remote`**：`credentials.describe(refs[])` / `set(ref, value)` 使用最新 Remote 参数与响应形状（`{ ok, value }`）；凭据变更事件从 `credentials/updated` 改为 `credentials/reference-updated`；不再经旧 `connection.api` 调用。
+- peerDependencies 中 dsh 包版本从 `0.1.0-rc.7` 提升到 `0.1.2-alpha.4`；`@deepseek-ai/cordis` / `@deepseek-ai/schemastery` 分别对齐 `^4.0.2` / `^3.18.2`；版本号升至 `0.4.0`，`User-Agent` 同步。
+
 ## [0.3.1] - 2026-08-30
 
 ### 修复
@@ -99,7 +108,7 @@
 
 ### 修复
 
-- **客户端 bundle 缺少 `exports.inject`**（`lib/client.js`）。浏览器插件原先只导出 `apply`，cordis 的 `fiber.inject` 为空，访问 `ctx.locale` 等服务会抛 `cannot get property "locale" without inject`。现在导出 `inject = ["slots", "locale", "connection", "remote", "settingsScope"]`。
+- **客户端 bundle 缺少 `exports.inject`**（`lib/client.js`）。浏览器插件原先只导出 `apply`，cordis 的 `fiber.inject` 为空，访问 `ctx.locale` 等服务会抛 `cannot get property "locale" without inject`。现在导出 `inject = ["slots", "locale", "remote", "settingsScope"]`。
 - **插件卡片的 slot 注册**（`lib/client.js`）。卡片按 rc.6 的 `id`/`order` 形状注册进 `settings.plugin.item`；该 slot 从 rc.6+ 起是 keyed 的，必须带 `key: "dsh-web-search-plugin"`。
 - **`CardForm.field("apiKey")` 崩溃**（`lib/client.js`）。只写凭据字段没有 section spec，对 `undefined` 调用 `spec.format(...)` 会在卡片投影时抛 `Cannot read properties of undefined (reading 'format')`。已加上 secret 字段分支（对齐官方 `CardForm`）。
 - **`dsh.client.inject` 补上 `@deepseek-ai/dsh-client-ui-slots`**（`package.json`），与社区插件的加载集合一致。

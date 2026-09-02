@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-search-plugin",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Unified web search for the DeepSeek Harness seam (ctx.web): DeepSeek (official), Tavily, Brave, Serper, SerpApi, Exa, SearXNG, Scavio, and Firecrawl backends",
   "keywords": [
     "dsh-plugin",
@@ -43,9 +43,7 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-api-remotes"
@@ -59,12 +57,12 @@
     "undici": "^6.21.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-web": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-credentials": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-settings": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-launch-environment": "^0.1.0-rc.7",
-    "@deepseek-ai/schemastery": "^3.18.1",
-    "@deepseek-ai/cordis": "^4.0.1"
+    "@deepseek-ai/dsh-web": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-credentials": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-settings": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-launch-environment": "^0.1.2-alpha.4",
+    "@deepseek-ai/schemastery": "^3.18.2",
+    "@deepseek-ai/cordis": "^4.0.2"
   },
   "license": "MIT",
   "repository": {
