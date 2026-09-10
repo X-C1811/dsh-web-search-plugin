@@ -3,14 +3,16 @@
 # installs the package as a plain library: no loader row, no Host apply, no
 # `/plugins/<name>/client.js`.
 #
-# `searchProvider` is restated in full because a Cordis patch replaces the
-# targeted row's whole `config`. The profile's own cordis.patch.yml still
-# wins if it later overrides `web`. The seam id is `dsh-web-search`; the
-# backend (DeepSeek / Tavily / Brave) is the plugin's own `provider` setting.
+# `searchProvider` and the upstream `fetchProvider` are restated in full
+# because a Cordis patch replaces the targeted row's whole `config`. The
+# profile's own cordis.patch.yml still wins if it later overrides `web`. The
+# seam id is `dsh-web-search`; the backend (DeepSeek / Tavily / Brave) is the
+# plugin's own `provider` setting.
 - id: web
   name: '@deepseek-ai/dsh-web'
   config:
     searchProvider: dsh-web-search
+    fetchProvider: http
 
 # This plugin re-hosts the DeepSeek backend, so the in-box DeepSeek host
 # plugin is redundant: disabling it removes its `deepseek-official` provider

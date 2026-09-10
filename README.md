@@ -29,7 +29,8 @@
 
 ## 运行要求
 
-- DeepSeek Harness `0.1.2-alpha.4`（最新 main）或更新
+- DeepSeek Harness `0.1.5-rc.1` 或兼容版本
+- Node.js `^22.19.0` 或 `>=24.0.0`
 - pnpm，用于通过 `dsh plugin` 把插件装进 profile
 
 ## 安装
@@ -72,7 +73,7 @@ dsh plugin --profile web add dsh-web-search-plugin
 | `country` | — | Brave 的 `country`（ISO 两位码，如 `cn`）；留空使用 Brave 默认 |
 | `searchLang` | — | Brave 的 `search_lang`（如 `zh-hans`）；留空使用 Brave 默认 |
 | `freshness` | — | Brave 的 `freshness`：`pd` / `pw` / `pm` / `py` |
-| `proxy` | — | Brave 使用的 HTTP(S) 代理；留空回退 `HTTPS_PROXY` / `HTTP_PROXY` |
+| `proxy` | — | Brave 使用的 HTTP(S) 代理覆盖；留空继承 DSH 的全局 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` 策略 |
 | `serperApiKey` / `serperApiKeyEnv` / `serperBaseURL` | — / `SERPER_API_KEY` / — | Serper 的 key 字面量 / 凭据引用名 / 端点覆盖 |
 | `serpapiApiKey` / `serpapiApiKeyEnv` / `serpapiBaseURL` | — / `SERPAPI_API_KEY` / — | SerpApi 的 key 字面量 / 凭据引用名 / 端点覆盖 |
 | `exaApiKey` / `exaApiKeyEnv` / `exaBaseURL` | — / `EXA_API_KEY` / — | Exa 的 key 字面量 / 凭据引用名 / 端点覆盖 |

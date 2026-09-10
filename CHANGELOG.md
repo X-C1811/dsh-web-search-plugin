@@ -2,6 +2,16 @@
 
 本项目的重要变更都记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.4.1] - 2026-09-10
+
+### 变更
+
+- **适配 DeepSeek Harness `0.1.5-rc.1`**：四个 DSH peerDependencies 提升到 `^0.1.5-rc.1`，Node.js 运行要求对齐为 `^22.19.0 || >=24.0.0`。
+- 浏览器端显式注入 `remote.credentials`，避免 API remote 尚未挂载时访问凭据服务的启动顺序竞态。
+- Bundle 覆盖 `web.config` 时保留上游 `fetchProvider: http`，不再因切换搜索 provider 而隐式清除抓取 provider。
+- Brave 的 `proxy` 仅作为 provider 级显式覆盖；留空时继承 DSH 的全局代理分发器，统一支持 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY`。
+- 版本号及 `User-Agent` 更新为 `0.4.1`。
+
 ## [0.4.0] - 2026-09-02
 
 ### 变更

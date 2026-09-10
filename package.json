@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-search-plugin",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Unified web search for the DeepSeek Harness seam (ctx.web): DeepSeek (official), Tavily, Brave, Serper, SerpApi, Exa, SearXNG, Scavio, and Firecrawl backends",
   "keywords": [
     "dsh-plugin",
@@ -24,7 +24,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": "^22.19.0 || >=24.0.0"
   },
   "exports": {
     ".": {
@@ -57,10 +57,10 @@
     "undici": "^6.21.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-web": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-credentials": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-settings": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-launch-environment": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-web": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-credentials": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-settings": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-launch-environment": "^0.1.5-rc.1",
     "@deepseek-ai/schemastery": "^3.18.2",
     "@deepseek-ai/cordis": "^4.0.2"
   },
