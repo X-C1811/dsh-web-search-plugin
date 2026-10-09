@@ -1,45 +1,38 @@
-// Smoke: verify Serper request body uses `q` and response parses organic[].
-// Run inside the profile dir so @deepseek-ai deps resolve.
-import { CustomSearchProvider } from "dsh-web-search-plugin";
+// Smoke: verify the shipped Serper metadata builds a q request and parses organic[].
+// Run inside a profile where dsh-web-search-plugin and its peer dependencies resolve.
+import { RestSearchProvider, findProvider } from "dsh-web-search-plugin";
 
-// Capture the body we'd send.
-let sentBody = null;
+const row = findProvider("serper");
+if (!row) throw new Error("Serper provider metadata is missing");
+
+let sentBody;
+let sentHeaders;
 const originalFetch = globalThis.fetch;
-globalThis.fetch = async (url, init) => {
-	sentBody = JSON.parse(init.body);
-	return {
-		ok: true,
-		status: 200,
-		json: async () => ({
-			organic: [
-				{ title: "Result A", link: "https://a.example", snippet: "Snippet A" },
-				{ title: "Result B", link: "https://b.example", snippet: "Snippet B" }
-			],
-			answerBox: { answer: "A generated answer." }
-		})
+try {
+	globalThis.fetch = async (_url, init) => {
+		sentBody = JSON.parse(init.body);
+		sentHeaders = init.headers;
+		return {
+			ok: true,
+			headers: new Headers(),
+			json: async () => ({
+				organic: [
+					{ title: "Result A", link: "https://a.example", snippet: "Snippet A" },
+					{ title: "Result B", link: "https://b.example", snippet: "Snippet B" }
+				],
+				answerBox: { answer: "A generated answer." }
+			})
+		};
 	};
-};
 
-const provider = new CustomSearchProvider("custom-serper", () => ({
-	name: "Serper",
-	baseURL: "https://google.serper.dev",
-	auth: "header",
-	authHeader: "X-API-KEY",
-	response: "serper",
-	queryParam: "",
-	apiKey: "test-key",
-	maxResults: 10
-}));
-
-const result = await provider.search({ query: "latest AI news" });
-console.log("sent body keys:", Object.keys(sentBody).join(","));
-console.log("body.q:", sentBody.q);
-console.log("sources count:", result.sources.length);
-console.log("first source:", JSON.stringify(result.sources[0]));
-console.log("content:", result.content);
-
-globalThis.fetch = originalFetch;
-if (sentBody.q !== "latest AI news") throw new Error("FAIL: q field missing");
-if (result.sources.length !== 2) throw new Error("FAIL: organic not parsed");
-if (result.sources[0].url !== "https://a.example") throw new Error("FAIL: link not mapped to url");
-console.log("SERPER OK");
+	const provider = new RestSearchProvider("serper", () => ({ ...row, apiKey: "test-key", maxResults: 10 }));
+	const result = await provider.search({ query: "latest AI news" });
+	if (sentBody.q !== "latest AI news") throw new Error("Serper q field missing");
+	if (sentBody.num !== 10) throw new Error("Serper result count is wrong");
+	if (sentHeaders["X-API-KEY"] !== "test-key") throw new Error("Serper API key header missing");
+	if (result.sources.length !== 2 || result.sources[0].url !== "https://a.example") throw new Error("Serper organic results were not mapped");
+	if (result.content !== "A generated answer.") throw new Error("Serper answer box was not mapped");
+	console.log("SERPER OK");
+} finally {
+	globalThis.fetch = originalFetch;
+}

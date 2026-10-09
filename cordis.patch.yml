@@ -14,9 +14,10 @@
     searchProvider: dsh-web-search
     fetchProvider: http
 
-# This plugin re-hosts the DeepSeek backend, so the in-box DeepSeek host
-# plugin is redundant: disabling it removes its `deepseek-official` provider
-# (no duplicate) and hides the legacy "Plugins → web search" card.
+# This bundle selects its own `dsh-web-search` seam provider and configures
+# DeepSeek through that provider. Disable the in-box DeepSeek host plugin so
+# the profile has one active DeepSeek configuration surface. Its provider id
+# is `deepseek-official`, distinct from this bundle's `dsh-web-search` id.
 - id: web-search-deepseek
   disabled: true
 

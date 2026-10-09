@@ -20,5 +20,8 @@ jobs:
       - name: Syntax check
         run: npm run check
 
+      - name: Provider regression tests
+        run: npm test
+
       - name: Pack dry-run
         run: npm pack --dry-run

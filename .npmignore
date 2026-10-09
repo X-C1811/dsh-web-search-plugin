@@ -1,7 +1,14 @@
-# Files excluded from the tarball; keep in sync with package.json "files".
-# The package has no build step: lib/ and cordis.patch.yml are committed and shipped as-is.
+# package.json "files" is the publish allowlist. These rules also protect local
+# files if that allowlist is broadened; the package has no build step.
 
 .git/
 .github/
-*.log
+.snapshots/
+.workbuddy/
+.tmp/
+.npm-cache/
+docs/
+test/
 node_modules/
+.smoke-serper.mjs
+*.log

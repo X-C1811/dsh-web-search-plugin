@@ -27,6 +27,9 @@ jobs:
       - name: Syntax check
         run: npm run check
 
+      - name: Provider regression tests
+        run: npm test
+
       - name: Verify tag matches package.json version
         run: |
           PKG_VERSION=$(npm pkg get version | tr -d '"')
@@ -37,13 +40,8 @@ jobs:
           fi
           echo "Publishing $PKG_VERSION"
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       # Release notes are taken from the matching CHANGELOG section, so the
-      # GitHub Release can never drift from the hand-maintained changelog.
+      # GitHub Release uses the hand-maintained changelog.
       - name: Extract changelog for this version
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -52,7 +50,16 @@ jobs:
             f && index($0, "## [") == 1 { exit }
             f { print }
           ' CHANGELOG.md > RELEASE_NOTES.md
+          if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
+            echo "::error::CHANGELOG.md has no release notes for $VERSION. Add a non-empty ## [$VERSION] section before publishing."
+            exit 1
+          fi
           cat RELEASE_NOTES.md
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         env:

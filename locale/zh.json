@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "网页搜索",
+    "description": "为 DeepSeek Harness 接缝（ctx.web）提供统一网页搜索：DeepSeek（官方）、Tavily、Brave、Serper、SerpApi、Exa、SearXNG、Scavio、Firecrawl，可在设置中切换引擎。"
+  }
+}

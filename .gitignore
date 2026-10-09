@@ -11,11 +11,13 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+.workbuddy/
 *.swp
 
 # Temp / scratch
 .tmp/
 .npm-cache/
+.snapshots/
 
 # Local-only design docs (kept on disk, not published to the remote)
 docs/

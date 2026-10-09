@@ -2,6 +2,47 @@
 
 本项目的重要变更都记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+## [0.5.0] - 2026-10-09
+
+### 新增
+
+- **适配 DeepSeek Harness `0.2.0-rc.2`**：四个 DSH peerDependencies 提升到 `^0.2.0-rc.2`，`@deepseek-ai/cordis` / `@deepseek-ai/schemastery` 对齐 `~4.0.4` / `~3.18.4`；版本号与 `User-Agent` 更新为 `0.5.0`。
+- DeepSeek 后端支持账号令牌认证：会话 provider 为 `deepseek-account` 时通过 `deepseekAccount.resolveToken()` 获取令牌并以 `x-dsh-auth-token` 发送，未授权时回落到 `DEEPSEEK_API_KEY`。
+- 有会话发起者时，DeepSeek 搜索在派发前记录脱敏请求到会话事件 `web/deepseek-search-llm-request`，与官方 provider 行为一致。
+- 插件列表页与详情页的标题、描述随界面语言切换：`locale/en.json` 与 `locale/zh.json`，经 `"./locale/*.json"` 导出（与官方 bundle 同一机制）。卡片内文案由 `lib/client.js` 的 `zh` / `en` 字典提供。
+- README 面向开源使用者整理：删除仅适用于本机的排查笔记与旧个人包迁移章节，修正与实现脱节的仓库布局与安装说明。
+
+### 移除
+
+- **`settings.installSection()` 已从 Harness 移除**：Host 侧改为全部配置字段声明 `volatile()`，并在 `apply` 中通过 `config.<field>.get()` 读取实时值。插件不再调用 `ctx.inject(["settings"])`，也不再维护 `setSource` / `current()` 这条配置来源链。
+- **客户端 `settingsScope` 服务已移除**：浏览器端改用 `ctx.configForms`。设置分区通过 `configForms.whileServed([namespace], register)` 条件注册，Host 未下发该命名空间时不留痕迹。`inject` 中的 `settingsScope` 同步替换为 `configForms`。
+- 设置分区不再自行注册 Host 设置卡：0.2.x 的设置由当前 Profile 的插件配置保存，`client.js` 的分区只负责展示与写入。
+
+### 修复
+
+- Exa 请求改用 `numResults` 与对象形态的 `contents.highlights`；SearXNG 不再发送其 API 未定义的 `count` 参数。
+- 插件 `maxResults` 与调用方上限取较小值，避免常规 `web_search` 请求覆盖设置卡上限；未选中的引擎不再解析其凭据引用，设置卡校验引用名格式。
+- Tavily 用量只保留当前凭据的内存数据，换 key 后立即重新对账；手动刷新限速改为 10 秒，自动刷新不受手动限速约束。
+- Firecrawl 搜索按 API 要求发送数组形态的 `sources`；REST 元数据的空 `countParam` 不再被强制改为 `max_results`。
+- DeepSeek 与 REST 后端按配置的 `maxResults` 截取超额结果，并标记 `truncated`。
+- 网页搜索设置分区随 Host 配置命名空间出现和撤销；凭据写入失败时保留草稿并显示失败提示。
+- 同时修改凭据引用名与 API key 时，密钥写入新的引用名；DeepSeek 账号令牌预检响应取消并统一映射错误。
+- Tavily 与 DeepSeek 的空端点配置恢复环境变量回退；Tavily 手动刷新额度增加最短请求间隔。
+- 设置卡把配置改动按同一 revision 原子提交；Host 拒绝写入时保留草稿，保存期间锁定编辑。写入新凭据时清空该引擎的字面量 key 覆盖，使新凭据生效。
+- 更新 Serper 冒烟脚本，使用当前导出的 `RestSearchProvider` 与内置元数据。
+
+### 文档
+
+- 澄清本插件注册的接缝 id 是 `dsh-web-search`，`deepseek-official` 只是内部引擎选项；同步修正 bundle patch、卸载说明和会话事件说明。
+- 对齐 README 的端点默认值、环境变量优先级和 API key 保存位置。
+
+### 说明
+
+- `cordis.patch.yml` 禁用内置 `web-search-deepseek`，使此 bundle 统一管理 DeepSeek 搜索配置；本插件注册的接缝 id 为 `dsh-web-search`。
+- Bundle patch 仍使用单文件声明（0.1.7 起支持的多文件有序声明为可选能力，未启用）。
+
 ## [0.4.1] - 2026-09-10
 
 ### 变更
@@ -82,7 +123,7 @@
 - Brave 月限额 `0` 的套餐按控制台 **Capacity** 展示每秒窗口（例如 50 次/秒），不再把月配额渲染成「已用 0 / 0」。Brave 没有花费/credits 接口。
 - 数字框只接受不小于 1 的整数；非法输入用红色错误文案替换灰色 hint，保存会被拦住。超出 20 的结果数量会夹到上限。
 
-## [0.2.0] - 2026-08-19
+## [0.2.0] - 2026-08-18
 
 ### 新增
 
