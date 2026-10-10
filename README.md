@@ -112,7 +112,7 @@ Clearing a text input or using “Restore default” in the card normally remove
     <tr>
       <td rowspan="4"><strong>DeepSeek (official)</strong></td>
       <td><code>deepseekModel</code></td>
-      <td><code>deepseek-v4-flash</code></td>
+      <td><code>deepseek-flash</code></td>
       <td>Model used only for the DeepSeek search request; does not change the conversation's chat model. Must be supported by the target endpoint</td>
     </tr>
     <tr>

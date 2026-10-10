@@ -112,7 +112,7 @@ DeepSeek 官方账号会话（provider 为 `deepseek-account`）会优先尝试�
     <tr>
       <td rowspan="4"><strong>DeepSeek（官方）</strong></td>
       <td><code>deepseekModel</code></td>
-      <td><code>deepseek-v4-flash</code></td>
+      <td><code>deepseek-flash</code></td>
       <td>仅 DeepSeek 搜索请求使用的模型名，不会修改会话的聊天模型；需由目标端点支持</td>
     </tr>
     <tr>

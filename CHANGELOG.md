@@ -10,6 +10,7 @@
 
 ### 变更
 
+- DeepSeek 官方搜索默认模型更新为 `deepseek-flash`，同步 Host 配置、后端回退、设置卡和中英文 README；保留用户显式配置的模型名。
 - 供应商专用配置统一增加前缀：Tavily 使用 `tavily*`，DeepSeek 搜索选项使用 `deepseek*`，Brave 使用 `brave*`；Scavio 的地区与语言选项独立为 `scavioCountry`、`scavioSearchLang`。通用的 `provider`、`maxResults` 保持不变。
 - 保留旧字段兼容读取；新字段优先，包括显式空字符串和 `false`。设置卡保存新名称，恢复默认时处理当前 Profile 的旧别名，并保留另一引擎依赖的旧共享地区或语言值。
 - 设置卡隐藏 API 协议版本输入框，保留 `deepseekApiVersion` 高级配置与旧 `apiVersion` 兼容。
