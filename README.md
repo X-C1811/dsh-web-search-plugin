@@ -1,207 +1,211 @@
 # dsh-web-search-plugin
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web 能力接缝（`ctx.web`）的统一网页搜索插件，内置 **DeepSeek（官方，默认）/ Tavily / [Brave Search](https://brave.com/search/api/) / Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl 九个后端**。本包只向接缝注册 **一个** `WebSearchProvider`，稳定 id 为 `dsh-web-search`。在 **设置 → 网页搜索** 里切换引擎即可，不必再改 `web.searchProvider`。
+English | [中文](./README.zh.md)
 
-- **DeepSeek（官方，默认）** — 走 DeepSeek 的 Anthropic 兼容 Messages API（原生 `web_search_20250305` 工具，支持账号令牌或 `DEEPSEEK_API_KEY`），一次搜索消耗一个模型轮次。
-- **Tavily** — `keyless`（免费、限流、无需账号）或 `keyed`（`TAVILY_API_KEY`，Bearer token）。keyed 会在设置卡显示额度进度条。
-- **Brave Search** — `GET https://api.search.brave.com/res/v1/web/search`，请求头 `X-Subscription-Token`（凭据名 `BRAVE_API_KEY`）。一次搜索就是一次 HTTP 请求，不走模型轮次；设置卡按响应头展示 Capacity / 月配额。
-- **Serper** — Google 结果（`POST /search`，头 `X-API-KEY`，凭据名 `SERPER_API_KEY`）。
-- **SerpApi** — `GET /search.json`，key 走 query（`api_key=`），凭据名 `SERPAPI_API_KEY`。
-- **Exa** — 语义/神经搜索（`POST /search`，Bearer，凭据名 `EXA_API_KEY`），请求 `contents.highlights` 作为结果摘要。
-- **SearXNG** — 自建/协议免 key 的元搜索（`GET /search?format=json`），可填自托管实例地址；实例须启用 JSON 输出。
-- **Scavio** — Google SERP（`POST /api/v2/google`，Bearer，凭据名 `SCAVIO_API_KEY`），响应与 SerpApi 同构。
-- **Firecrawl** — 网页搜索（`POST /v2/search`，Bearer，凭据名 `FIRECRAWL_API_KEY`），`sources: ["web"]`；当前请求没有启用整页抓取。
-- **DuckDuckGo** — 无官方搜索 API，不提供独立后端；下拉中以禁用项提示：选 SearXNG 并指向聚合了 DuckDuckGo 的实例即可。
-- **官方 key 跳转** — 需要 key 的内置 provider 在设置卡带「获取 API key ↗」一键跳官方控制台；免 key 的（SearXNG / Tavily keyless）不渲染。
-- **会话事件** — 有会话发起者时，DeepSeek 在派发前记录脱敏模型请求到 `web/deepseek-search-llm-request`；REST 后端不追加自定义事件。
+A unified web search plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), with **nine built-in providers: DeepSeek (official, default), Tavily, [Brave Search](https://brave.com/search/api/), Serper, SerpApi, Exa, SearXNG, Scavio, and Firecrawl**. Switch engines in **Settings → Web search** without changing `web.searchProvider`. The plugin registers a single `WebSearchProvider` with the stable ID `dsh-web-search` through the `ctx.web` extension point.
 
-## 特性
+- **DeepSeek (official, default)** — Uses DeepSeek's Anthropic-compatible Messages API with the native `web_search_20250305` tool. Supports account tokens or `DEEPSEEK_API_KEY`; each search consumes one model turn.
+- **Tavily** — Supports `keyless` access (free, rate-limited, no account required) or `keyed` access (`TAVILY_API_KEY`, Bearer token). The settings card shows a quota bar in keyed mode.
+- **Brave Search** — Calls `GET https://api.search.brave.com/res/v1/web/search` with the `X-Subscription-Token` header (credential name: `BRAVE_API_KEY`). Each search is one HTTP request and does not consume a model turn. The settings card displays Capacity and monthly quota from response headers.
+- **Serper** — Google results via `POST /search`, using the `X-API-KEY` header (credential name: `SERPER_API_KEY`).
+- **SerpApi** — Calls `GET /search.json` with the key in the query string (`api_key=`; credential name: `SERPAPI_API_KEY`).
+- **Exa** — Semantic/neural search via `POST /search` with Bearer authentication (credential name: `EXA_API_KEY`). Requests `contents.highlights` for result summaries.
+- **SearXNG** — Metasearch with no API key required by the protocol. Calls `GET /search?format=json` and supports a self-hosted instance URL. The instance must enable JSON output.
+- **Scavio** — Google SERP via `POST /api/v2/google` with Bearer authentication (credential name: `SCAVIO_API_KEY`). Uses the same response structure as SerpApi.
+- **Firecrawl** — Web search via `POST /v2/search` with Bearer authentication (credential name: `FIRECRAWL_API_KEY`) and `sources: ["web"]`. Full-page scraping is not enabled in the current request.
+- **DuckDuckGo** — No standalone backend is provided because there is no official search API. A disabled entry in the engine selector directs users to SearXNG with an instance that aggregates DuckDuckGo.
+- **API key links** — Built-in providers that require a key include a “Get API key ↗” link to the official dashboard in the settings card. Providers that do not require a key (SearXNG and Tavily keyless) do not show this link.
+- **Session events** — When a session initiator is available, DeepSeek records a redacted model request as `web/deepseek-search-llm-request` before dispatch. REST backends do not append custom events.
 
-- 与官方 `@deepseek-ai/dsh-web-search-deepseek` 相同的提供方约定：`inject: ['web']` + 全`volatile()` 配置字段 + `ctx.web.registerSearchProvider`。
-- 自定义配置卡片位于 **设置 → 网页搜索**。
-- **默认引擎为 DeepSeek（官方）**：新装 / 未显式改动时，搜索直接走 `deepseek-official`，不再依赖 keyless 的 Tavily。
-- **9 个后端**中，8 个纯 REST 后端由**静态元数据表 + 通用后端**驱动；只有 DeepSeek 官方走模型轮次。新增内置 REST 引擎还需同步配置字段和客户端引擎列表。
-- Tavily keyless 无需密钥即可用；Brave 需要订阅 token（若本机已有 `BRAVE_API_KEY` 凭据，可直接复用）。
-- Tavily keyed / Brave 在设置卡展示额度进度条（DeepSeek 官方与 Tavily keyless / 其余 REST 后端不展示）。
-- 各引擎结果都规范化为接缝的 `WebSearchResult`（可选 `content` + `sources[]`），按 URL 去重。
-- 配置由当前 Profile 的插件配置保存，全部字段声明为 `volatile()`：改引擎或端点后无需重启插件即可生效。
-- 插件列表页与详情页的标题、描述随界面语言切换（`locale/*.json`）；卡片内文案自带中英字典。
-- 错误映射为 `WEB_PROVIDER_ERROR` / `WEB_ABORTED` / `WEB_PROVIDER_CREDENTIAL_MISSING`。
+## Features
 
-## 运行要求
+- Follows the same provider contract as the official `@deepseek-ai/dsh-web-search-deepseek`: `inject: ['web']`, all configuration fields declared with `volatile()`, and `ctx.web.registerSearchProvider`.
+- A dedicated configuration card in **Settings → Web search**.
+- **Official DeepSeek search is the default** for new installations and unchanged configurations, using `deepseek-official` rather than keyless Tavily.
+- Of the **nine backends**, eight REST backends use a **static metadata table and a shared backend**. Only official DeepSeek search consumes model turns. Adding a built-in REST engine also requires updating the configuration fields and client engine list.
+- Tavily keyless works without a key. Brave requires a subscription token; an existing `BRAVE_API_KEY` credential can be reused.
+- Tavily keyed and Brave display quota bars in the settings card. Official DeepSeek, Tavily keyless, and the other REST backends do not.
+- Results are normalized to `WebSearchResult` (optional `content` and `sources[]`) and deduplicated by URL.
+- Configuration is saved in the current profile's plugin configuration. All fields use `volatile()`, so changes to engines or endpoints take effect without restarting the plugin.
+- Plugin list and detail page titles and descriptions follow the interface language through `locale/*.json`. The settings card has its own English and Chinese dictionaries.
+- Errors are mapped to `WEB_PROVIDER_ERROR`, `WEB_ABORTED`, or `WEB_PROVIDER_CREDENTIAL_MISSING`.
 
-- DeepSeek Harness `0.2.0-rc.2` 或兼容的 `0.2.x` 版本
-- Node.js `^22.19.0` 或 `>=24.0.0`
-- pnpm，用于通过 `dsh plugin` 把插件装进 profile
+## Requirements
 
-## 安装
+- DeepSeek Harness `0.2.0-rc.2` or a compatible `0.2.x` release
+- Node.js `^22.19.0` or `>=24.0.0`
+- pnpm, used by `dsh plugin` to install the plugin into a profile
 
-本包是 **bundle**：`dsh.bundle.patch` + `cordis.patch.yml` 会插入 Host 行、把 `web.searchProvider` 设为 `dsh-web-search`，并禁用内置 `web-search-deepseek` Host 插件，使此 profile 的 DeepSeek 搜索由本插件统一配置。本插件注册到接缝的 id 是 `dsh-web-search`；`deepseek-official` 是内部引擎选项，和内置插件注册的 id 不同。没有 bundle 声明时，`dsh plugin add` 只写入依赖，插件不会挂载。
+## Installation
 
-### 从 npm 安装
+This package is a **bundle**. `dsh.bundle.patch` and `cordis.patch.yml` add the Host entry, set `web.searchProvider` to `dsh-web-search`, and disable the built-in `web-search-deepseek` Host plugin, so this plugin manages DeepSeek search for the profile. The registered provider ID is `dsh-web-search`; `deepseek-official` is an internal engine option and differs from the ID registered by the built-in plugin. Without a bundle declaration, `dsh plugin add` only adds the dependency and does not mount the plugin.
+
+### Install from npm
 
 ```powershell
 dsh plugin --profile web add dsh-web-search-plugin
 ```
 
-> 从源码仓库本地安装（含 Windows 跨盘注意事项）见 [开发 → 本地安装与验证](#本地安装与验证)。
+> For installation from a local source checkout, including Windows cross-drive considerations, see [Development → Local installation and verification](#local-installation-and-verification).
 
-## 配置
+## Configuration
 
-设置卡编辑的是 `dsh-web-search-plugin` 命名空间。设置卡中的 API key 输入框把密钥写入凭据服务；若直接在插件配置中填写 `*ApiKey` 字段，则该字面量保存在插件配置中。建议使用设置卡或凭据引用名，避免在配置文件中保存密钥。
+The settings card edits the `dsh-web-search-plugin` namespace. Its API key inputs write keys to the credentials service. If you set `*ApiKey` fields directly in the plugin configuration, those literal values are stored in the configuration instead. Use the settings card or credential reference names to avoid storing keys in configuration files.
 
-| 键 | 默认值 | 含义 |
+| Key | Default | Description |
 |---|---|---|
-| `provider` | `deepseek-official` | `tavily`、`brave`、`deepseek-official`、`serper`、`serpapi`、`exa`、`searxng`、`scavio` 或 `firecrawl` |
-| `mode` | `keyless` | 仅 Tavily：`keyless` 或 `keyed` |
-| `apiKey` | — | Tavily API key 配置字面量；设置卡的 key 输入框写入凭据服务 |
-| `apiKeyEnv` | `TAVILY_API_KEY` | keyed Tavily 使用的凭据/环境变量名 |
-| `baseURL` | 空 | Tavily REST 基址；留空时依次使用 `TAVILY_BASE_URL` 和 `https://api.tavily.com`，再拼 `/search` |
-| `maxResults` | `8` | 插件返回的源数量上限，与调用方的 `request.maxResults` 取较小值。设置卡为 1–20 下拉；SearXNG 不支持请求级数量参数，只在收到结果后截取 |
-| `searchDepth` | `basic` | 仅 Tavily：`basic` 或 `advanced` |
-| `includeAnswer` | `true` | 仅 Tavily：请求生成摘要，写入结果 `content` |
-| `topic` | `general` | 仅 Tavily：`general` 或 `news` |
-| `deepseekApiKey` | — | DeepSeek API key 配置字面量；设置卡的 key 输入框写入凭据服务 |
-| `deepseekApiKeyEnv` | `DEEPSEEK_API_KEY` | DeepSeek 使用的凭据/环境变量名 |
-| `deepseekBaseURL` | 空 | DeepSeek Anthropic 兼容 Messages 基址；留空时依次使用 `DEEPSEEK_SEARCH_BASE_URL` 和 `https://api.deepseek.com/anthropic/v1`，再拼 `/messages` |
-| `model` | `deepseek-v4-flash` | Anthropic 格式模型名 |
-| `apiVersion` | `2023-06-01` | `anthropic-version` 请求头 |
-| `maxTokens` | `4096` | Messages 请求生成 token 上限 |
-| `maxUses` | `5` | 每次请求 `web_search` 工具的最大调用次数 |
-| `braveApiKey` | — | Brave 订阅 token 配置字面量；设置卡的 key 输入框写入凭据服务 |
-| `braveApiKeyEnv` | `BRAVE_API_KEY` | Brave 使用的凭据/环境变量名 |
-| `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | Brave 网页搜索接口 |
-| `country` | — | Brave 的 `country`（ISO 两位码，如 `cn`）；留空使用 Brave 默认 |
-| `searchLang` | — | Brave 的 `search_lang`（如 `zh-hans`）；留空使用 Brave 默认 |
-| `freshness` | — | Brave 的 `freshness`：`pd` / `pw` / `pm` / `py` |
-| `proxy` | — | Brave 使用的 HTTP(S) 代理覆盖；留空继承 DSH 的全局 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` 策略 |
-| `serperApiKey` / `serperApiKeyEnv` / `serperBaseURL` | — / `SERPER_API_KEY` / `https://google.serper.dev` | Serper 的配置字面量 key / 凭据引用名 / REST 基址 |
-| `serpapiApiKey` / `serpapiApiKeyEnv` / `serpapiBaseURL` | — / `SERPAPI_API_KEY` / `https://serpapi.com` | SerpApi 的配置字面量 key / 凭据引用名 / REST 基址 |
-| `exaApiKey` / `exaApiKeyEnv` / `exaBaseURL` | — / `EXA_API_KEY` / `https://api.exa.ai` | Exa 的配置字面量 key / 凭据引用名 / REST 基址 |
-| `searxngBaseURL` | `https://searx.be` | SearXNG 实例基址；可改为自托管地址 |
-| `scavioApiKey` / `scavioApiKeyEnv` / `scavioBaseURL` | — / `SCAVIO_API_KEY` / `https://api.scavio.dev` | Scavio 的配置字面量 key / 凭据引用名 / REST 基址 |
-| `firecrawlApiKey` / `firecrawlApiKeyEnv` / `firecrawlBaseURL` | — / `FIRECRAWL_API_KEY` / `https://api.firecrawl.dev` | Firecrawl 的配置字面量 key / 凭据引用名 / REST 基址 |
+| `provider` | `deepseek-official` | `tavily`, `brave`, `deepseek-official`, `serper`, `serpapi`, `exa`, `searxng`, `scavio`, or `firecrawl` |
+| `mode` | `keyless` | Tavily only: `keyless` or `keyed` |
+| `apiKey` | — | Literal Tavily API key in configuration; the settings card's key input writes to the credentials service |
+| `apiKeyEnv` | `TAVILY_API_KEY` | Credential/environment variable name for keyed Tavily |
+| `baseURL` | Empty | Tavily REST base URL; if empty, tries `TAVILY_BASE_URL`, then `https://api.tavily.com`, and appends `/search` |
+| `maxResults` | `8` | Maximum number of sources returned, capped by the caller's `request.maxResults`. The settings card offers 1–20. SearXNG has no request-level result count parameter, so results are truncated after retrieval |
+| `searchDepth` | `basic` | Tavily only: `basic` or `advanced` |
+| `includeAnswer` | `true` | Tavily only: requests a generated summary and writes it to the result's `content` |
+| `topic` | `general` | Tavily only: `general` or `news` |
+| `deepseekApiKey` | — | Literal DeepSeek API key in configuration; the settings card's key input writes to the credentials service |
+| `deepseekApiKeyEnv` | `DEEPSEEK_API_KEY` | Credential/environment variable name for DeepSeek |
+| `deepseekBaseURL` | Empty | DeepSeek Anthropic-compatible Messages base URL; if empty, tries `DEEPSEEK_SEARCH_BASE_URL`, then `https://api.deepseek.com/anthropic/v1`, and appends `/messages` |
+| `model` | `deepseek-v4-flash` | Model name in Anthropic format |
+| `apiVersion` | `2023-06-01` | Value of the `anthropic-version` request header |
+| `maxTokens` | `4096` | Maximum generated tokens for the Messages request |
+| `maxUses` | `5` | Maximum number of `web_search` tool calls per request |
+| `braveApiKey` | — | Literal Brave subscription token in configuration; the settings card's key input writes to the credentials service |
+| `braveApiKeyEnv` | `BRAVE_API_KEY` | Credential/environment variable name for Brave |
+| `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | Brave web search endpoint |
+| `country` | — | Brave `country` (two-letter ISO code, such as `cn`); left empty to use Brave's default |
+| `searchLang` | — | Brave `search_lang` (such as `zh-hans`); left empty to use Brave's default |
+| `freshness` | — | Brave `freshness`: `pd` / `pw` / `pm` / `py` |
+| `proxy` | — | HTTP(S) proxy override for Brave; if empty, inherits DSH's global `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` policy |
+| `serperApiKey` / `serperApiKeyEnv` / `serperBaseURL` | — / `SERPER_API_KEY` / `https://google.serper.dev` | Serper literal key / credential reference name / REST base URL |
+| `serpapiApiKey` / `serpapiApiKeyEnv` / `serpapiBaseURL` | — / `SERPAPI_API_KEY` / `https://serpapi.com` | SerpApi literal key / credential reference name / REST base URL |
+| `exaApiKey` / `exaApiKeyEnv` / `exaBaseURL` | — / `EXA_API_KEY` / `https://api.exa.ai` | Exa literal key / credential reference name / REST base URL |
+| `searxngBaseURL` | `https://searx.be` | SearXNG instance base URL; can point to a self-hosted instance |
+| `scavioApiKey` / `scavioApiKeyEnv` / `scavioBaseURL` | — / `SCAVIO_API_KEY` / `https://api.scavio.dev` | Scavio literal key / credential reference name / REST base URL |
+| `firecrawlApiKey` / `firecrawlApiKeyEnv` / `firecrawlBaseURL` | — / `FIRECRAWL_API_KEY` / `https://api.firecrawl.dev` | Firecrawl literal key / credential reference name / REST base URL |
 
-## 未纳入的服务
+## Services not included
 
-以下服务**不内置**（在引擎下拉中不会出现，也不提供后端）：
+The following services have **no built-in backend**:
 
-| 服务 | 不做的原因 |
+| Service | Reason |
 |---|---|
-| **TinyFish** | 免费额度极小（每分钟 5 次）；其 Search + Fetch 形态超出"纯 REST 搜索"边界，仅搜索部分价值低 |
-| **Google CSE** | 官方已对新用户关闭注册，并将于 2027-01-01 停用 |
-| **SERPJET** | 官网当前不可访问，暂不接入 |
-| **DuckDuckGo** | 无官方搜索 API（HTML/社区库抓取不符合元数据表"纯 REST"边界）。下拉中有禁用提示，指引经 SearXNG 使用 |
+| **TinyFish** | Very small free allowance (5 requests per minute). Its Search + Fetch model extends beyond the scope of REST-only search, with limited value from the search portion alone |
+| **Google CSE** | Registration is closed to new users, and the service is scheduled to shut down on 2027-01-01 |
+| **SERPJET** | The official website is currently inaccessible, so integration is deferred |
+| **DuckDuckGo** | No official search API; HTML/community-library scraping does not fit the metadata table's REST-only scope. A disabled selector entry directs users to SearXNG |
 
-环境变量：启动时 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` 会选中本接缝 id。`baseURL` 留空时，Tavily 基址回退 `TAVILY_BASE_URL`；`deepseekBaseURL` 留空时回退 `DEEPSEEK_SEARCH_BASE_URL`。
+These services are not selectable engines. DuckDuckGo appears only as a disabled hint, as described above.
 
-## 额度
+Environment variables: setting `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` at startup selects this registered provider ID. When `baseURL` is empty, Tavily falls back to `TAVILY_BASE_URL`; when `deepseekBaseURL` is empty, DeepSeek falls back to `DEEPSEEK_SEARCH_BASE_URL`.
 
-- **Tavily keyless / DeepSeek 官方**：不展示额度条。前者是免费限流、没有账户配额；后者按次扣费、没有月度限额。
-- **Tavily keyed**：搜索时请求 `include_usage`，在内存中累加当前凭据的 credits。Host 定时调用 `GET /usage`，设置卡也可手动刷新；手动刷新之间至少间隔 10 秒，自动对账不受此限制。用 `account.current_plan` / `plan_limit` 做限额，用量取当前凭据的本地累计与远端的较大值；换 key 时清空旧账户用量并立即重新对账。旧 Tavily 额度不再持久化到磁盘。
-- **Brave**：没有 usage / 花费接口。控制台 **Capacity** 就是响应头里的每秒窗口（例如 50 次/秒）。月限额 `0` 表示不限请求次数，不是额度用完。计费 credits 只能看 [Brave API 控制台](https://api-dashboard.search.brave.com/)。
-- 浏览器只读 `GET /dsh-web-search/usage`（不直打上游）。进度条：剩余超过 20% 为绿色，不超过 20% 为黄色，不超过 10% 为红色。
+## Quotas
 
-## 卸载
+- **Tavily keyless / official DeepSeek**: No quota bar. Tavily keyless is free and rate-limited, with no account quota; official DeepSeek is billed per use, with no monthly limit.
+- **Tavily keyed**: Requests `include_usage` during searches and accumulates credits for the current credential in memory. The Host periodically calls `GET /usage`, and the settings card supports manual refresh. Manual refreshes must be at least 10 seconds apart; automatic reconciliation is not subject to this limit. The quota comes from `account.current_plan` / `plan_limit`; usage is the larger of the local total for the current credential and the remote value. Changing keys clears the previous account's usage and triggers immediate reconciliation. Tavily quota data is no longer persisted to disk.
+- **Brave**: No usage/spending endpoint. Dashboard **Capacity** represents the per-second window from response headers (for example, 50 requests/second). A monthly limit of `0` means unlimited requests, not an exhausted quota. Billing credits are available only in the [Brave API dashboard](https://api-dashboard.search.brave.com/).
+- The browser reads only `GET /dsh-web-search/usage` and does not call upstream services directly. Quota bars are green when more than 20% remains, yellow at 20% or less, and red at 10% or less.
 
-若要改用 DSH 内置的 DeepSeek host 插件，先卸载本插件及其 bundle patch：
+## Uninstallation
+
+To switch back to DSH's built-in DeepSeek Host plugin, remove this plugin and its bundle patch first:
 
 ```powershell
 dsh plugin --profile web remove dsh-web-search-plugin
 ```
 
-随后检查 profile 中实际生效的 `web.searchProvider`；若曾手工覆盖为 `dsh-web-search`，将该覆盖改回 `deepseek-official`。
+Then check the profile's effective `web.searchProvider`. If you manually overrode it with `dsh-web-search`, change that override back to `deepseek-official`.
 
-## 工作方式
+## How it works
 
-- **DeepSeek** — `POST {deepseekBaseURL}/messages`，工具 `web_search_20250305`。会话运行在 DeepSeek 官方账号路由（provider 为 `deepseek-account`）且账号服务允许该端点时，用账号令牌发 `x-dsh-auth-token`；否则回落到 API key（`x-api-key` / `authorization: Bearer`，凭据名 `DEEPSEEK_API_KEY`）。有会话发起者时，在派发前把脱敏请求记录为会话事件 `web/deepseek-search-llm-request`。
-- **纯 REST 类（Tavily / Brave / Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl）** — 由静态元数据表（`lib/providers.js`）+ 通用后端（`lib/rest.js`）驱动。请求方法 / 路径 / 查询字段名 / 鉴权（bearer / header / none / query）/ 固定参数 / 响应形态由表中的行决定。
-  - **Tavily** — `POST {baseURL}/search`。keyless 发送 `x-tavily-access-mode: keyless`；keyed 发送 `authorization: Bearer <key>`，并带 `include_usage` 回传 credits。
-  - **Brave** — `GET {braveBaseURL}?q=&count=`，请求头 `x-subscription-token`。不向 session 追加自定义事件。
-  - **其余六种 REST 引擎** — 按各自表的 `method` / `auth` / `params` 约定请求。
-- 非 2xx 映射为 `WEB_PROVIDER_ERROR`；调用方取消映射为 `WEB_ABORTED`。
+- **DeepSeek** — Calls `POST {deepseekBaseURL}/messages` with the `web_search_20250305` tool. If the session uses the official DeepSeek account route (provider: `deepseek-account`) and the account service allows the endpoint, the request uses an account token in `x-dsh-auth-token`. Otherwise, it falls back to an API key (`x-api-key` / `authorization: Bearer`, credential name: `DEEPSEEK_API_KEY`). When a session initiator is available, a redacted request is recorded as the session event `web/deepseek-search-llm-request` before dispatch.
+- **REST backends (Tavily / Brave / Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl)** — Driven by a static metadata table (`lib/providers.js`) and a shared backend (`lib/rest.js`). Table rows define the request method, path, query field names, authentication (`bearer` / `header` / `none` / `query`), fixed parameters, and response shape.
+  - **Tavily** — Calls `POST {baseURL}/search`. Keyless mode sends `x-tavily-access-mode: keyless`; keyed mode sends `authorization: Bearer <key>` and requests `include_usage` for credits.
+  - **Brave** — Calls `GET {braveBaseURL}?q=&count=` with the `x-subscription-token` header. Does not append custom session events.
+  - **The other six REST engines** — Follow their metadata entries' `method`, `auth`, and `params` definitions.
+- Non-2xx responses map to `WEB_PROVIDER_ERROR`; caller cancellation maps to `WEB_ABORTED`.
 
-## 仓库布局
+## Repository layout
 
+```text
+lib/index.js       Host plugin: volatile Config, metadata-based provider dispatch, quota routes
+lib/providers.js   Static metadata: requests/auth/responses/API key links for 8 REST providers (plus DeepSeek in deepseek.js, for 9 backends total)
+lib/rest.js        Shared REST backend: metadata-driven requests and response normalization, including Tavily/Brave quota and rate-limit hooks
+lib/deepseek.js    DeepSeek backend: Anthropic Messages, web_search_20250305, account tokens
+lib/tavily.js      Dedicated Tavily backend and option parsing (current dispatch uses the shared REST backend)
+lib/brave.js       Dedicated Brave backend and option parsing (current dispatch uses the shared REST backend)
+lib/usage.js       Local Tavily/Brave usage cache and /usage reconciliation
+lib/shared.js      Cancellation and credential resolution helpers
+lib/client.js      Browser bundle: settings section, engine switching, API key links, quota bars
+locale/en.json     English titles and descriptions for plugin list/detail pages
+locale/zh.json     Chinese titles and descriptions for the same pages
+cordis.patch.yml   Bundle patch: adds Host entry, sets searchProvider, disables built-in DeepSeek
 ```
-lib/index.js       Host 插件：volatile Config、按元数据分发提供方、额度路由
-lib/providers.js   静态元数据表：8 个 REST provider（另加 deepseek.js 的 DeepSeek，共9 个后端）的请求/鉴权/响应/官方跳转（纯数据，无定制代码）
-lib/rest.js        通用 REST 后端：按元数据驱动请求构造与响应规范化（含 Tavily / Brave 的额度与限流 hook）
-lib/deepseek.js    DeepSeek 后端（Anthropic Messages + web_search_20250305 + 账号令牌）
-lib/tavily.js      Tavily 专用后端与选项解析（当前分发使用 rest 通用后端）
-lib/brave.js       Brave 专用后端与选项解析（当前分发使用 rest 通用后端）
-lib/usage.js       Tavily/Brave 用量本地缓存与 /usage 对账
-lib/shared.js      中止 / 凭据解析辅助
-lib/client.js      浏览器 bundle：设置分区 + 引擎切换 + 官方 key 跳转 + 额度条
-locale/en.json     插件列表页 / 详情页的英文标题与描述
-locale/zh.json     同上，中文
-cordis.patch.yml   Bundle patch：插入 Host 行、设 searchProvider、禁用内置 deepseek
-```
 
-## 开发
+## Development
 
-### 本地安装与验证
+### Local installation and verification
 
-改源码后本机验证，把仓库装进某个 profile（以 `web` 为例）。**同盘**可以直接用相对路径：
+After editing the source, install the checkout into a profile (using `web` as the example) for local verification. If the checkout and profile are on the **same drive**, you can use a relative path:
 
 ```powershell
 dsh plugin --profile web add ".\dsh-web-search-plugin"
 ```
 
-**Windows 跨盘不要 `dsh plugin add` 绝对路径。** Profile 与仓库不在同一盘时，它会写成 `link:` 或 `file:` 加绝对盘符；pnpm 会把盘符当成相对路径，junction 指向一个不存在的目录。做法是先把仓库快照到与 profile **同盘**，再用相对 `file:`：
+**On Windows, do not pass an absolute path to `dsh plugin add` across drives.** If the profile and checkout are on different drives, the dependency is written as `link:` or `file:` with an absolute drive letter. pnpm treats the drive letter as a relative path, leaving the junction pointing to a nonexistent directory. Copy a snapshot of the checkout onto the **same drive** as the profile, then use a relative `file:` reference:
 
 ```powershell
 $dst = "$env:USERPROFILE\.dsh\profiles\web\.local\dsh-web-search-plugin"
-robocopy "<仓库路径>" $dst /E /XD node_modules .git .github .snapshots .workbuddy docs /NFL /NDL /NJH /NJS
+robocopy "<repository-path>" $dst /E /XD node_modules .git .github .snapshots .workbuddy docs /NFL /NDL /NJH /NJS
 ```
 
-在 profile 的 `package.json` 里：
+In the profile's `package.json`:
 
 ```json
 "dsh-web-search-plugin": "file:.local/dsh-web-search-plugin"
 ```
 
-并保证 `dsh.profile.bundles` 含本包，然后：
+Ensure that `dsh.profile.bundles` includes this package, then run:
 
 ```powershell
 dsh plugin --profile web install
 ```
 
-`file:` 是快照：改完仓库后要再 robocopy + `install` 并重启 DSH。改了 `package.json` 的 `files` 字段时，pnpm 可能认为快照未变化而跳过更新，需要先删掉 `node_modules/dsh-web-search-plugin` 再装。
+`file:` is a snapshot: after source changes, copy the files again with robocopy, run `install`, and restart DSH. If you change the package's `files` field, pnpm may consider the snapshot unchanged and skip the update; remove `node_modules/dsh-web-search-plugin` before reinstalling in that case.
 
-用 `dsh --profile web --dump-config` 确认：组成树里应有 `dsh-web-search-plugin` 行，且 `web.searchProvider` 为 `dsh-web-search`。
+Use `dsh --profile web --dump-config` to verify that the composition tree includes `dsh-web-search-plugin` and that `web.searchProvider` is `dsh-web-search`.
 
-### 语法检查
+### Syntax checks
 
 ```powershell
 npm run check
 npm test
 ```
 
-客户端 bundle 必须保持 `window.__ModuleLoader__.load({ id, factory })` 线格式 — 由 `dsh-client-modules` 加载，不是打包器。必须同时导出 `apply` 和 `inject`（`slots`、`locale`、`remote`、`remote.credentials`、`configForms`）。
+The client bundle must retain the `window.__ModuleLoader__.load({ id, factory })` wire format: it is loaded by `dsh-client-modules`, not a bundler. It must export both `apply` and `inject` (`slots`, `locale`, `remote`, `remote.credentials`, `configForms`).
 
-配置卡片的宿主就是**设置 → 网页搜索**（`settings.section`，`id: "web-search"`），数据来自 `ctx.configForms.get("dsh-web-search-plugin")`，并通过 `configForms.whileServed([namespace], register)` 条件注册：Host 未下发该命名空间时不留痕迹。
+The configuration card is hosted in **Settings → Web search** (`settings.section`, `id: "web-search"`). Its data comes from `ctx.configForms.get("dsh-web-search-plugin")`, and registration is conditional through `configForms.whileServed([namespace], register)`. When the Host does not serve this namespace, the card is not registered.
 
-本插件不在插件详情页（`plugins.bundle.config`）显示配置。
+The plugin does not show configuration on the plugin detail page (`plugins.bundle.config`).
 
-## 本地化
+## Localization
 
-插件列表页与详情页的标题和描述走 `locale/<lang>.json`，随界面语言切换：
+Plugin list and detail page titles and descriptions use `locale/<lang>.json` and follow the interface language:
 
-```
+```text
 locale/en.json    {"meta": {"title": "Web search", "description": "…"}}
 locale/zh.json    {"meta": {"title": "网页搜索", "description": "…"}}
 ```
 
-卡片内的文案由 `lib/client.js` 的 `zh` / `en` 两份字典提供，改动时须保持键名对齐。
+Settings card text comes from the `zh` and `en` dictionaries in `lib/client.js`. Keep their keys aligned when editing them.
 
-## 发布
+## Publishing
 
-发布由 GitHub Actions（`.github/workflows/publish.yml`）自动完成：**推送与 `package.json` 版本一致的 `v*` 标签**会带 provenance 发到 npm。向 `main` 的普通推送不会发布。
+GitHub Actions (`.github/workflows/publish.yml`) handles publishing automatically. **Pushing a `v*` tag that matches the version in `package.json`** publishes to npm with provenance. Ordinary pushes to `main` do not publish a package.
 
-1. 确认 `package.json` 的 `version` 与即将推送的标签一致，并在 `CHANGELOG.md` 中为该版本填写非空的 `## [版本号]` 章节。
-2. 在 GitHub **Settings → Secrets and variables → Actions** 里配置有 publish 权限的 npm automation token（仓库密钥 `NPM_TOKEN`），并允许 Actions 运行。
-3. 打标签并推送：
+1. Check that `package.json`'s `version` matches the tag you will push, and add a nonempty `## [version]` section for that version in `CHANGELOG.md`.
+2. Configure an npm automation token with publishing permissions as the repository secret `NPM_TOKEN` under GitHub **Settings → Secrets and variables → Actions**, and enable Actions.
+3. Tag and push:
 
    ```powershell
    $version = node -p "require('./package.json').version"
@@ -209,12 +213,12 @@ locale/zh.json    {"meta": {"title": "网页搜索", "description": "…"}}
    git push origin "v$version"
    ```
 
-工作流会先核对标签与 `package.json` 的 `version`，确认 `CHANGELOG.md` 中对应版本的发布说明非空，再执行 `npm publish --provenance --access public`。
+The workflow checks that the tag matches `package.json`'s `version` and that the corresponding release notes in `CHANGELOG.md` are nonempty, then runs `npm publish --provenance --access public`.
 
-## 参与贡献
+## Contributing
 
-欢迎提 issue 和 pull request，见 [issue tracker](https://github.com/X-C1811/dsh-web-search-plugin/issues)。还可以在同一接缝 id 下继续加搜索后端。
+Issues and pull requests are welcome. See the [issue tracker](https://github.com/X-C1811/dsh-web-search-plugin/issues). Additional search backends can be added under the same registered provider ID.
 
-## 许可证
+## License
 
 [MIT](LICENSE)
