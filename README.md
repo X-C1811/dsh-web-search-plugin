@@ -84,19 +84,6 @@ The settings card edits the `dsh-web-search-plugin` namespace. Its API key input
 | `scavioApiKey` / `scavioApiKeyEnv` / `scavioBaseURL` | — / `SCAVIO_API_KEY` / `https://api.scavio.dev` | Scavio literal key / credential reference name / REST base URL |
 | `firecrawlApiKey` / `firecrawlApiKeyEnv` / `firecrawlBaseURL` | — / `FIRECRAWL_API_KEY` / `https://api.firecrawl.dev` | Firecrawl literal key / credential reference name / REST base URL |
 
-## Services not included
-
-The following services have **no built-in backend**:
-
-| Service | Reason |
-|---|---|
-| **TinyFish** | Very small free allowance (5 requests per minute). Its Search + Fetch model extends beyond the scope of REST-only search, with limited value from the search portion alone |
-| **Google CSE** | Registration is closed to new users, and the service is scheduled to shut down on 2027-01-01 |
-| **SERPJET** | The official website is currently inaccessible, so integration is deferred |
-| **DuckDuckGo** | No official search API; HTML/community-library scraping does not fit the metadata table's REST-only scope. A disabled selector entry directs users to SearXNG |
-
-These services are not selectable engines. DuckDuckGo appears only as a disabled hint, as described above.
-
 Environment variables: setting `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` at startup selects this registered provider ID. When `baseURL` is empty, Tavily falls back to `TAVILY_BASE_URL`; when `deepseekBaseURL` is empty, DeepSeek falls back to `DEEPSEEK_SEARCH_BASE_URL`.
 
 ## Quotas

@@ -84,17 +84,6 @@ dsh plugin --profile web add dsh-web-search-plugin
 | `scavioApiKey` / `scavioApiKeyEnv` / `scavioBaseURL` | — / `SCAVIO_API_KEY` / `https://api.scavio.dev` | Scavio 的配置字面量 key / 凭据引用名 / REST 基址 |
 | `firecrawlApiKey` / `firecrawlApiKeyEnv` / `firecrawlBaseURL` | — / `FIRECRAWL_API_KEY` / `https://api.firecrawl.dev` | Firecrawl 的配置字面量 key / 凭据引用名 / REST 基址 |
 
-## 未纳入的服务
-
-以下服务**不内置**（在引擎下拉中不会出现，也不提供后端）：
-
-| 服务 | 不做的原因 |
-|---|---|
-| **TinyFish** | 免费额度极小（每分钟 5 次）；其 Search + Fetch 形态超出"纯 REST 搜索"边界，仅搜索部分价值低 |
-| **Google CSE** | 官方已对新用户关闭注册，并将于 2027-01-01 停用 |
-| **SERPJET** | 官网当前不可访问，暂不接入 |
-| **DuckDuckGo** | 无官方搜索 API（HTML/社区库抓取不符合元数据表"纯 REST"边界）。下拉中有禁用提示，指引经 SearXNG 使用 |
-
 环境变量：启动时 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` 会选中本接缝 id。`baseURL` 留空时，Tavily 基址回退 `TAVILY_BASE_URL`；`deepseekBaseURL` 留空时回退 `DEEPSEEK_SEARCH_BASE_URL`。
 
 ## 额度
