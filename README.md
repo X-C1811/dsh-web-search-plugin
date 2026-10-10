@@ -2,9 +2,20 @@
 
 English | [中文](./README.zh.md)
 
-A unified web search plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), with **nine built-in providers: DeepSeek (official, default), Tavily, [Brave Search](https://brave.com/search/api/), Serper, SerpApi, Exa, SearXNG, Scavio, and Firecrawl**. Switch engines in **Settings → Web search** without changing `web.searchProvider`. The plugin registers a single `WebSearchProvider` with the stable ID `dsh-web-search` through the `ctx.web` extension point.
+A web search plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that gives your agent more search options through Harness's existing `web_search` tool. Choose from **nine providers** and manage engines, API keys, and search options in **Settings → Web search**.
 
-- **DeepSeek (official, default)** — Uses DeepSeek's Anthropic-compatible Messages API with the native `web_search_20250305` tool. Supports account tokens or `DEEPSEEK_API_KEY`; each search consumes one model turn.
+## Why use this plugin?
+
+- **Avoid an extra DeepSeek model call for search.** The eight third-party backends call search APIs directly instead of DeepSeek's official model-backed search endpoint. This avoids the additional DeepSeek model token usage for that search request. (Your conversation and the model's processing of search results still use tokens, and search providers may charge their own fees or credits.)
+- **Configure everything in a settings card.** Switch engines, enter keys, and adjust result limits in **Settings → Web search**, then save. Changes take effect on the next search without restarting the plugin or editing YAML.
+- **Choose the search service that fits your needs.** Use Google results through Serper, semantic search through Exa, or a self-hosted SearXNG instance. Tavily's keyless mode lets you try search without an account or API key.
+- **Return to built-in search with one switch.** Turn off the entire `dsh-web-search-plugin` bundle in the sidebar's **Plugins** page to remove its search overrides and restore Harness's built-in DeepSeek search under the standard profile configuration. See [Disable or uninstall](#disable-or-uninstall).
+
+**The default engine is still DeepSeek (official).** To avoid the extra official search model call, select a third-party engine in the settings card after installation and save your changes. Selecting DeepSeek (official) uses the official search API and may incur model invocation charges.
+
+## Supported providers
+
+- **DeepSeek (official, default)** — Uses DeepSeek's Anthropic-compatible Messages API with the native search tool type `web_search_20250305`. Supports account tokens or `DEEPSEEK_API_KEY`. Each search sends a model request and may incur model invocation charges.
 - **Tavily** — Supports `keyless` access (free, rate-limited, no account required) or `keyed` access (`TAVILY_API_KEY`, Bearer token). The settings card shows a quota bar in keyed mode.
 - **Brave Search** — Calls `GET https://api.search.brave.com/res/v1/web/search` with the `X-Subscription-Token` header (credential name: `BRAVE_API_KEY`). Each search is one HTTP request and does not consume a model turn. The settings card displays Capacity and monthly quota from response headers.
 - **Serper** — Google results via `POST /search`, using the `X-API-KEY` header (credential name: `SERPER_API_KEY`).
@@ -13,22 +24,8 @@ A unified web search plugin for [DeepSeek Harness](https://github.com/deepseek-a
 - **SearXNG** — Metasearch with no API key required by the protocol. Calls `GET /search?format=json` and supports a self-hosted instance URL. The instance must enable JSON output.
 - **Scavio** — Google SERP via `POST /api/v2/google` with Bearer authentication (credential name: `SCAVIO_API_KEY`). Uses the same response structure as SerpApi.
 - **Firecrawl** — Web search via `POST /v2/search` with Bearer authentication (credential name: `FIRECRAWL_API_KEY`) and `sources: ["web"]`. Full-page scraping is not enabled in the current request.
-- **DuckDuckGo** — No standalone backend is provided because there is no official search API. A disabled entry in the engine selector directs users to SearXNG with an instance that aggregates DuckDuckGo.
-- **API key links** — Built-in providers that require a key include a “Get API key ↗” link to the official dashboard in the settings card. Providers that do not require a key (SearXNG and Tavily keyless) do not show this link.
-- **Session events** — When a session initiator is available, DeepSeek records a redacted model request as `web/deepseek-search-llm-request` before dispatch. REST backends do not append custom events.
 
-## Features
-
-- Follows the same provider contract as the official `@deepseek-ai/dsh-web-search-deepseek`: `inject: ['web']`, all configuration fields declared with `volatile()`, and `ctx.web.registerSearchProvider`.
-- A dedicated configuration card in **Settings → Web search**.
-- **Official DeepSeek search is the default** for new installations and unchanged configurations, using `deepseek-official` rather than keyless Tavily.
-- Of the **nine backends**, eight REST backends use a **static metadata table and a shared backend**. Only official DeepSeek search consumes model turns. Adding a built-in REST engine also requires updating the configuration fields and client engine list.
-- Tavily keyless works without a key. Brave requires a subscription token; an existing `BRAVE_API_KEY` credential can be reused.
-- Tavily keyed and Brave display quota bars in the settings card. Official DeepSeek, Tavily keyless, and the other REST backends do not.
-- Results are normalized to `WebSearchResult` (optional `content` and `sources[]`) and deduplicated by URL.
-- Configuration is saved in the current profile's plugin configuration. All fields use `volatile()`, so changes to engines or endpoints take effect without restarting the plugin.
-- Plugin list and detail page titles and descriptions follow the interface language through `locale/*.json`. The settings card has its own English and Chinese dictionaries.
-- Errors are mapped to `WEB_PROVIDER_ERROR`, `WEB_ABORTED`, or `WEB_PROVIDER_CREDENTIAL_MISSING`.
+For DuckDuckGo results, choose a SearXNG instance that aggregates DuckDuckGo. DuckDuckGo appears only as a disabled hint in the engine selector.
 
 ## Requirements
 
@@ -38,87 +35,212 @@ A unified web search plugin for [DeepSeek Harness](https://github.com/deepseek-a
 
 ## Installation
 
-This package is a **bundle**. `dsh.bundle.patch` and `cordis.patch.yml` add the Host entry, set `web.searchProvider` to `dsh-web-search`, and disable the built-in `web-search-deepseek` Host plugin, so this plugin manages DeepSeek search for the profile. The registered provider ID is `dsh-web-search`; `deepseek-official` is an internal engine option and differs from the ID registered by the built-in plugin. Without a bundle declaration, `dsh plugin add` only adds the dependency and does not mount the plugin.
-
 ### Install from npm
 
 ```powershell
 dsh plugin --profile web add dsh-web-search-plugin
 ```
 
+After installation, configure the plugin in the Harness Web UI:
+
+1. Open **Settings → Web search** and find the plugin's settings card. The sidebar's **Plugins** page controls whether the bundle is enabled; engine settings live in this card.
+2. Choose a search engine. For direct API search without an extra DeepSeek model call, select Tavily, Brave, Serper, SerpApi, Exa, SearXNG, Scavio, or Firecrawl.
+3. Enter the engine's API key if required. Engines that require a key show “Get API key ↗”, which opens the official dashboard. For Tavily without a key, choose `keyless`; for SearXNG, set an instance URL with JSON search enabled. These two keyless options do not show a key dashboard link. Existing credentials can be reused, such as `BRAVE_API_KEY` for Brave.
+4. Adjust the result limit and other options, then click **Save**. The next search uses the saved engine and settings.
+
 > For installation from a local source checkout, including Windows cross-drive considerations, see [Development → Local installation and verification](#local-installation-and-verification).
 
 ## Configuration
 
-The settings card edits the `dsh-web-search-plugin` namespace. Its API key inputs write keys to the credentials service. If you set `*ApiKey` fields directly in the plugin configuration, those literal values are stored in the configuration instead. Use the settings card or credential reference names to avoid storing keys in configuration files.
+For normal use, configure the plugin in **Settings → Web search**. The card shows options for the selected engine and saves ordinary settings to the current profile's `dsh-web-search-plugin` configuration. The tables below describe the underlying configuration, including advanced fields hidden from the card; not every field is shown at once.
 
-| Key | Default | Description |
+### General settings
+
+| Key | Default | Meaning and scope |
 |---|---|---|
-| `provider` | `deepseek-official` | `tavily`, `brave`, `deepseek-official`, `serper`, `serpapi`, `exa`, `searxng`, `scavio`, or `firecrawl` |
-| `mode` | `keyless` | Tavily only: `keyless` or `keyed` |
-| `apiKey` | — | Literal Tavily API key in configuration; the settings card's key input writes to the credentials service |
-| `apiKeyEnv` | `TAVILY_API_KEY` | Credential/environment variable name for keyed Tavily |
-| `baseURL` | Empty | Tavily REST base URL; if empty, tries `TAVILY_BASE_URL`, then `https://api.tavily.com`, and appends `/search` |
-| `maxResults` | `8` | Maximum number of sources returned, capped by the caller's `request.maxResults`. The settings card offers 1–20. SearXNG has no request-level result count parameter, so results are truncated after retrieval |
-| `searchDepth` | `basic` | Tavily only: `basic` or `advanced` |
-| `includeAnswer` | `true` | Tavily only: requests a generated summary and writes it to the result's `content` |
-| `topic` | `general` | Tavily only: `general` or `news` |
-| `deepseekApiKey` | — | Literal DeepSeek API key in configuration; the settings card's key input writes to the credentials service |
-| `deepseekApiKeyEnv` | `DEEPSEEK_API_KEY` | Credential/environment variable name for DeepSeek |
-| `deepseekBaseURL` | Empty | DeepSeek Anthropic-compatible Messages base URL; if empty, tries `DEEPSEEK_SEARCH_BASE_URL`, then `https://api.deepseek.com/anthropic/v1`, and appends `/messages` |
-| `model` | `deepseek-v4-flash` | Model name in Anthropic format |
-| `apiVersion` | `2023-06-01` | Value of the `anthropic-version` request header |
-| `maxTokens` | `4096` | Maximum generated tokens for the Messages request |
-| `maxUses` | `5` | Maximum number of `web_search` tool calls per request |
-| `braveApiKey` | — | Literal Brave subscription token in configuration; the settings card's key input writes to the credentials service |
-| `braveApiKeyEnv` | `BRAVE_API_KEY` | Credential/environment variable name for Brave |
-| `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | Brave web search endpoint |
-| `country` | — | Brave `country` (two-letter ISO code, such as `cn`); left empty to use Brave's default |
-| `searchLang` | — | Brave `search_lang` (such as `zh-hans`); left empty to use Brave's default |
-| `freshness` | — | Brave `freshness`: `pd` / `pw` / `pm` / `py` |
-| `proxy` | — | HTTP(S) proxy override for Brave; if empty, inherits DSH's global `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` policy |
-| `serperApiKey` / `serperApiKeyEnv` / `serperBaseURL` | — / `SERPER_API_KEY` / `https://google.serper.dev` | Serper literal key / credential reference name / REST base URL |
-| `serpapiApiKey` / `serpapiApiKeyEnv` / `serpapiBaseURL` | — / `SERPAPI_API_KEY` / `https://serpapi.com` | SerpApi literal key / credential reference name / REST base URL |
-| `exaApiKey` / `exaApiKeyEnv` / `exaBaseURL` | — / `EXA_API_KEY` / `https://api.exa.ai` | Exa literal key / credential reference name / REST base URL |
-| `searxngBaseURL` | `https://searx.be` | SearXNG instance base URL; can point to a self-hosted instance |
-| `scavioApiKey` / `scavioApiKeyEnv` / `scavioBaseURL` | — / `SCAVIO_API_KEY` / `https://api.scavio.dev` | Scavio literal key / credential reference name / REST base URL |
-| `firecrawlApiKey` / `firecrawlApiKeyEnv` / `firecrawlBaseURL` | — / `FIRECRAWL_API_KEY` / `https://api.firecrawl.dev` | Firecrawl literal key / credential reference name / REST base URL |
+| `provider` | `deepseek-official` | Active engine: `deepseek-official`, `tavily`, `brave`, `serper`, `serpapi`, `exa`, `searxng`, `scavio`, or `firecrawl`. Each request uses only the selected engine, with no automatic failover to another engine on error. Unknown values fall back to official DeepSeek |
+| `maxResults` | `8` | Maximum returned sources for all engines, from 1–20, also capped by the caller's `request.maxResults`. SearXNG and Scavio send no request-level count parameter; their results are truncated after retrieval and URL deduplication. The upstream response determines how many results are actually available |
 
-Environment variables: setting `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` at startup selects this registered provider ID. When `baseURL` is empty, Tavily falls back to `TAVILY_BASE_URL`; when `deepseekBaseURL` is empty, DeepSeek falls back to `DEEPSEEK_SEARCH_BASE_URL`.
+### Keys and credential references
+
+**The card's “API Key” input differs from the literal configuration fields below.** When you enter and save a new key, the card writes it under the current engine's credential reference rather than storing the plaintext key in plugin configuration. It also sets the corresponding literal field to an empty string so an old configuration key cannot override the new credential. Leaving the input blank preserves the existing key; it does not delete it. Use Harness's credential management capabilities to delete a credential.
+
+| Engine | Literal configuration field | Credential reference field | Default reference |
+|---|---|---|---|
+| DeepSeek (API key authentication) | `deepseekApiKey` | `deepseekApiKeyEnv` | `DEEPSEEK_API_KEY` |
+| Tavily (`keyed` only) | `tavilyApiKey` | `tavilyApiKeyEnv` | `TAVILY_API_KEY` |
+| Brave | `braveApiKey` | `braveApiKeyEnv` | `BRAVE_API_KEY` |
+| Serper | `serperApiKey` | `serperApiKeyEnv` | `SERPER_API_KEY` |
+| SerpApi | `serpapiApiKey` | `serpapiApiKeyEnv` | `SERPAPI_API_KEY` |
+| Exa | `exaApiKey` | `exaApiKeyEnv` | `EXA_API_KEY` |
+| Scavio | `scavioApiKey` | `scavioApiKeyEnv` | `SCAVIO_API_KEY` |
+| Firecrawl | `firecrawlApiKey` | `firecrawlApiKeyEnv` | `FIRECRAWL_API_KEY` |
+
+All literal fields default to an empty string. A manually configured nonempty literal key takes priority. Otherwise, the plugin resolves the reference through **the credentials service → the Harness launching environment → process environment variables**, in that order. `*ApiKeyEnv` holds a reference name, not the key itself; the card requires names matching `[A-Za-z_][A-Za-z0-9_]*`.
+
+Official DeepSeek account sessions (provider: `deepseek-account`) first try an account token authorized for the endpoint by the account service. If no token is obtained, search uses the API key path above. Tavily `keyless` and SearXNG search requests require no API key. Configuring a Tavily key does not automatically select `keyed`; choose that mode explicitly. The current SearXNG backend has no instance-token or custom authentication-header setting.
+
+Credential writes and profile configuration saves happen in separate steps. Failed saves retain the draft, but successfully written credentials are not automatically rolled back. Prefer the card for everyday key management to avoid storing plaintext literals in configuration files.
+
+### Endpoints
+
+| Key | Default | Address rules |
+|---|---|---|
+| `deepseekBaseURL` | Empty string | DeepSeek Anthropic-compatible Messages base: nonempty configuration → `DEEPSEEK_SEARCH_BASE_URL` in the launching environment → `https://api.deepseek.com/anthropic/v1`; appends `/messages` |
+| `tavilyBaseURL` | Empty string | Tavily base: nonempty configuration → `TAVILY_BASE_URL` in the launching environment → `https://api.tavily.com`; appends `/search` |
+| `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | Full web search endpoint; no path is appended |
+| `serperBaseURL` | `https://google.serper.dev` | Appends `/search` |
+| `serpapiBaseURL` | `https://serpapi.com` | Appends `/search.json` |
+| `exaBaseURL` | `https://api.exa.ai` | Appends `/search` |
+| `searxngBaseURL` | `https://searx.be` | Appends `/search?format=json` with the search query; the instance must allow JSON search. The default address is not guaranteed to work; a self-hosted instance can be used |
+| `scavioBaseURL` | `https://api.scavio.dev` | Appends `/api/v2/google` |
+| `firecrawlBaseURL` | `https://api.firecrawl.dev` | Appends `/v2/search` |
+
+Changing an engine's address does not change its request method, authentication, or response parsing. Custom endpoints must implement the corresponding engine's protocol; replacing a URL alone cannot connect an arbitrary search API. Except for Brave, omit the automatically appended paths listed above when entering a base URL. Engines other than Tavily and DeepSeek fall back to their built-in address when the effective address setting is empty, with no additional dedicated environment variable fallback.
+
+Clearing a text input or using “Restore default” in the card normally removes the current profile's override and uses the inherited or default value. This differs from manually writing an empty string into configuration. Endpoint fallbacks are evaluated against the effective configuration value.
+
+### Provider-specific options
+
+<table>
+  <thead>
+    <tr><th>Provider</th><th>Key</th><th>Default</th><th>Meaning and scope</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="4"><strong>DeepSeek (official)</strong></td>
+      <td><code>deepseekModel</code></td>
+      <td><code>deepseek-v4-flash</code></td>
+      <td>Model used only for the DeepSeek search request; does not change the conversation's chat model. Must be supported by the target endpoint</td>
+    </tr>
+    <tr>
+      <td><code>deepseekApiVersion</code></td>
+      <td><code>2023-06-01</code></td>
+      <td>Value of the <code>anthropic-version</code> header. Hidden from the settings card and retained as advanced configuration; normally leave at the default</td>
+    </tr>
+    <tr>
+      <td><code>deepseekMaxTokens</code></td>
+      <td><code>4096</code></td>
+      <td>Maximum generated tokens for one DeepSeek Messages search request, a positive integer; not a conversation-wide token limit</td>
+    </tr>
+    <tr>
+      <td><code>deepseekMaxUses</code></td>
+      <td><code>5</code></td>
+      <td>Maximum native <code>web_search</code> tool uses within one DeepSeek Messages request, a positive integer; not an engine retry count or result count</td>
+    </tr>
+    <tr>
+      <td rowspan="4"><strong>Tavily</strong></td>
+      <td><code>tavilyMode</code></td>
+      <td><code>keyless</code></td>
+      <td>Tavily only: keyless access (<code>keyless</code>) or API key access (<code>keyed</code>); does not control authentication for other engines</td>
+    </tr>
+    <tr>
+      <td><code>tavilySearchDepth</code></td>
+      <td><code>basic</code></td>
+      <td>Tavily only: <code>basic</code> or <code>advanced</code>, sent as <code>search_depth</code></td>
+    </tr>
+    <tr>
+      <td><code>tavilyIncludeAnswer</code></td>
+      <td><code>true</code></td>
+      <td>Tavily only: requests <code>include_answer: true</code> when enabled. The current shared REST backend omits the parameter when disabled; if upstream still returns an answer, it can still become result <code>content</code>. This does not guarantee removal of all answer text</td>
+    </tr>
+    <tr>
+      <td><code>tavilyTopic</code></td>
+      <td><code>general</code></td>
+      <td>Tavily only: <code>general</code> or <code>news</code></td>
+    </tr>
+    <tr>
+      <td rowspan="4"><strong>Brave</strong></td>
+      <td><code>braveCountry</code></td>
+      <td>Empty string</td>
+      <td>Brave only: sent as <code>country</code> (two-letter country code, such as <code>cn</code>); omitted when the effective value is empty</td>
+    </tr>
+    <tr>
+      <td><code>braveSearchLang</code></td>
+      <td>Empty string</td>
+      <td>Brave only: sent as <code>search_lang</code> (such as <code>zh-hans</code>); omitted when the effective value is empty</td>
+    </tr>
+    <tr>
+      <td><code>braveFreshness</code></td>
+      <td>Empty string</td>
+      <td>Brave only: <code>pd</code> / <code>pw</code> / <code>pm</code> / <code>py</code> for the past day / week / month / year. Empty means no time filter</td>
+    </tr>
+    <tr>
+      <td><code>braveProxy</code></td>
+      <td>Empty string</td>
+      <td>Explicit HTTP(S) proxy override for Brave only. If empty, no separate proxy is set and Harness's global network policy applies. Other engines do not use this field</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><strong>Scavio</strong></td>
+      <td><code>scavioCountry</code></td>
+      <td>Empty string</td>
+      <td>Scavio only: sent as <code>gl</code>, using a country/region code accepted by that service; omitted when the effective value is empty</td>
+    </tr>
+    <tr>
+      <td><code>scavioSearchLang</code></td>
+      <td>Empty string</td>
+      <td>Scavio only: sent as <code>hl</code>, using a language code accepted by that service; omitted when the effective value is empty. New settings are independent of Brave</td>
+    </tr>
+  </tbody>
+</table>
+
+The startup environment variable `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` selects Harness's registered search provider ID, not this plugin's `provider` engine option. Installing the bundle normally selects the provider already, so this variable is not required.
 
 ## Quotas
 
-- **Tavily keyless / official DeepSeek**: No quota bar. Tavily keyless is free and rate-limited, with no account quota; official DeepSeek is billed per use, with no monthly limit.
+- **DeepSeek (official)**: No quota bar. Search still makes a model request, with usage subject to your account or API billing.
+- **Tavily keyless**: No quota bar; access is free and rate-limited.
 - **Tavily keyed**: Requests `include_usage` during searches and accumulates credits for the current credential in memory. The Host periodically calls `GET /usage`, and the settings card supports manual refresh. Manual refreshes must be at least 10 seconds apart; automatic reconciliation is not subject to this limit. The quota comes from `account.current_plan` / `plan_limit`; usage is the larger of the local total for the current credential and the remote value. Changing keys clears the previous account's usage and triggers immediate reconciliation. Tavily quota data is no longer persisted to disk.
 - **Brave**: No usage/spending endpoint. Dashboard **Capacity** represents the per-second window from response headers (for example, 50 requests/second). A monthly limit of `0` means unlimited requests, not an exhausted quota. Billing credits are available only in the [Brave API dashboard](https://api-dashboard.search.brave.com/).
 - The browser reads only `GET /dsh-web-search/usage` and does not call upstream services directly. Quota bars are green when more than 20% remains, yellow at 20% or less, and red at 10% or less.
 
-## Uninstallation
+## Disable or uninstall
 
-To switch back to DSH's built-in DeepSeek Host plugin, remove this plugin and its bundle patch first:
+### Switch to DeepSeek (official) first
+
+If you only want to use official search again, select **DeepSeek (official)** in **Settings → Web search** and save. There is no need to disable or uninstall this plugin. The next search uses the official search API through this plugin and may still incur model invocation charges.
+
+### Disable and restore built-in search
+
+Use the following steps when you want to stop using this plugin and restore Harness's original search plugin. Selecting this plugin's DeepSeek engine and restoring the original plugin are separate operations.
+
+Open **Plugins** in the sidebar and turn off the **entire `dsh-web-search-plugin` bundle**. Under the standard Harness profile configuration, this removes the bundle's search-provider override and its override disabling the built-in DeepSeek plugin, restoring built-in search without uninstalling the package. You can turn the bundle back on later.
+
+Use the bundle's main switch: disabling only an individual component inside the bundle leaves its other configuration overrides in place. Profiles with configuration hot reload apply the change immediately; otherwise, restart Harness.
+
+If you manually set `web.searchProvider: dsh-web-search`, `DSH_WEB_SEARCH_PROVIDER=dsh-web-search`, or a separate override disabling the built-in DeepSeek plugin, also remove or revert those overrides. The bundle switch does not undo settings you added separately.
+
+### Uninstall the package
+
+To remove the installed package as well, run:
 
 ```powershell
 dsh plugin --profile web remove dsh-web-search-plugin
 ```
 
-Then check the profile's effective `web.searchProvider`. If you manually overrode it with `dsh-web-search`, change that override back to `deepseek-official`.
+The same checks for manually added overrides apply after uninstallation. If you explicitly selected `dsh-web-search`, remove that override to use the profile default, or set `web.searchProvider` back to `deepseek-official`.
 
 ## How it works
 
+The plugin registers a single `WebSearchProvider` with the stable ID `dsh-web-search` through `ctx.web`, following the same provider contract as `@deepseek-ai/dsh-web-search-deepseek` (`inject: ['web']` and `ctx.web.registerSearchProvider`). Switching internal engines does not require changing `web.searchProvider`. Results are normalized to `WebSearchResult` (optional `content` and `sources[]`) and deduplicated by URL. All configuration fields use `volatile()`, so saved settings are read without restarting the plugin.
+
+This package is a **bundle**. The `dsh.bundle.patch` declaration points to `cordis.patch.yml`, which adds the Host entry, selects `dsh-web-search`, and disables the built-in `web-search-deepseek` Host plugin while the bundle is enabled. The plugin's internal `deepseek-official` engine option is distinct from its registered `dsh-web-search` ID. Disabling the entire bundle removes this patch layer; disabling only its Host entry does not. Without a bundle declaration, `dsh plugin add` only adds the dependency and does not mount the plugin.
+
 - **DeepSeek** — Calls `POST {deepseekBaseURL}/messages` with the `web_search_20250305` tool. If the session uses the official DeepSeek account route (provider: `deepseek-account`) and the account service allows the endpoint, the request uses an account token in `x-dsh-auth-token`. Otherwise, it falls back to an API key (`x-api-key` / `authorization: Bearer`, credential name: `DEEPSEEK_API_KEY`). When a session initiator is available, a redacted request is recorded as the session event `web/deepseek-search-llm-request` before dispatch.
-- **REST backends (Tavily / Brave / Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl)** — Driven by a static metadata table (`lib/providers.js`) and a shared backend (`lib/rest.js`). Table rows define the request method, path, query field names, authentication (`bearer` / `header` / `none` / `query`), fixed parameters, and response shape.
-  - **Tavily** — Calls `POST {baseURL}/search`. Keyless mode sends `x-tavily-access-mode: keyless`; keyed mode sends `authorization: Bearer <key>` and requests `include_usage` for credits.
+- **REST backends (Tavily / Brave / Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl)** — Driven by a static metadata table (`lib/providers.js`) and a shared backend (`lib/rest.js`). Table rows define the request method, path, query field names, authentication (`bearer` / `header` / `none` / `query`), fixed parameters, and response shape. REST backends do not append custom session events.
+  - **Tavily** — Calls `POST {tavilyBaseURL}/search`. Keyless mode sends `x-tavily-access-mode: keyless`; keyed mode sends `authorization: Bearer <key>` and requests `include_usage` for credits.
   - **Brave** — Calls `GET {braveBaseURL}?q=&count=` with the `x-subscription-token` header. Does not append custom session events.
   - **The other six REST engines** — Follow their metadata entries' `method`, `auth`, and `params` definitions.
-- Non-2xx responses map to `WEB_PROVIDER_ERROR`; caller cancellation maps to `WEB_ABORTED`.
+- Non-2xx responses map to `WEB_PROVIDER_ERROR`; caller cancellation maps to `WEB_ABORTED`; missing credentials map to `WEB_PROVIDER_CREDENTIAL_MISSING`.
 
 ## Repository layout
 
 ```text
+lib/config.js      Supplier field naming and legacy configuration resolution
 lib/index.js       Host plugin: volatile Config, metadata-based provider dispatch, quota routes
+lib/deepseek.js    DeepSeek backend: Anthropic Messages, web_search_20250305, account tokens
 lib/providers.js   Static metadata: requests/auth/responses/API key links for 8 REST providers (plus DeepSeek in deepseek.js, for 9 backends total)
 lib/rest.js        Shared REST backend: metadata-driven requests and response normalization, including Tavily/Brave quota and rate-limit hooks
-lib/deepseek.js    DeepSeek backend: Anthropic Messages, web_search_20250305, account tokens
 lib/tavily.js      Dedicated Tavily backend and option parsing (current dispatch uses the shared REST backend)
 lib/brave.js       Dedicated Brave backend and option parsing (current dispatch uses the shared REST backend)
 lib/usage.js       Local Tavily/Brave usage cache and /usage reconciliation

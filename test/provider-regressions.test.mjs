@@ -3,8 +3,24 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import vm from "node:vm";
+import { SUPPLIER_CONFIG_ALIASES, resolveSupplierConfig } from "../lib/config.js";
 
 const root = new URL("../", import.meta.url);
+
+test("prefixed fields preserve legacy values and respect explicit empty/false overrides", () => {
+	const old = { apiKey: "old-key", baseURL: "https://old.test", includeAnswer: true, country: "us", maxTokens: 100 };
+	const legacy = resolveSupplierConfig(old);
+	assert.equal(legacy.tavilyApiKey, "old-key");
+	assert.equal(legacy.tavilyBaseURL, "https://old.test");
+	assert.equal(legacy.deepseekMaxTokens, 100);
+	assert.equal(legacy.braveCountry, "us");
+	assert.equal(legacy.scavioCountry, "us");
+	const current = resolveSupplierConfig({ ...old, tavilyApiKey: "", tavilyIncludeAnswer: false, braveCountry: "gb", scavioCountry: "cn" });
+	assert.equal(current.tavilyApiKey, "");
+	assert.equal(current.tavilyIncludeAnswer, false);
+	assert.equal(current.braveCountry, "gb");
+	assert.equal(current.scavioCountry, "cn");
+});
 
 async function loadModule(file, fetchImpl, environment = {}, now = () => Date.now(), extraMocks = {}) {
 	class WebError extends Error {
@@ -28,12 +44,14 @@ async function loadModule(file, fetchImpl, environment = {}, now = () => Date.no
 			operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
 		}),
 		isAbortError: () => false,
+		isPositiveInteger: (value) => Number.isInteger(value) && value > 0,
 		resolveApiKey: async (options) => options.apiKey,
 		resolveSecret: () => ({}),
 		searchAborted: () => new WebError("Search aborted", "WEB_ABORTED"),
 		throwIfSearchAborted: (signal) => { if (signal?.aborted) throw new WebError("Search aborted", "WEB_ABORTED"); }
 	};
 	const mocks = {
+		"./config.js": { SUPPLIER_CONFIG_ALIASES, resolveSupplierConfig },
 		"@deepseek-ai/dsh-web": { WebError },
 		"@deepseek-ai/dsh-launch-environment": { launchEnvironmentOf: () => ({ get: (key) => environment[key] === undefined ? undefined : { value: environment[key] } }) },
 		"undici": { ProxyAgent: class ProxyAgent {} },
@@ -43,7 +61,8 @@ async function loadModule(file, fetchImpl, environment = {}, now = () => Date.no
 		"node:fs/promises": { mkdir: async () => {}, readFile: async () => "{}", writeFile: async () => {} },
 		"./usage.js": { parseTavilySearchCredits: () => null },
 		"./shared.js": shared,
-		...extraMocks
+		...extraMocks,
+		"./shared.js": { ...shared, ...extraMocks["./shared.js"] }
 	};
 	const module = new vm.SourceTextModule(readFileSync(new URL(file, root), "utf8"), { context });
 	await module.link(async (specifier) => {
@@ -75,6 +94,58 @@ test("an inactive engine's invalid credential reference cannot break the selecte
 	let selected;
 	apply({ effect: () => {}, inject: () => {}, web: { registerSearchProvider: (provider) => { selected = provider; } } }, config);
 	assert.equal(selected.available(), true);
+});
+
+test("supplier option resolvers prefer prefixed fields over legacy configuration", async () => {
+	const secretMock = { resolveSecret: (_ctx, source) => ({ apiKey: source.literal, apiKeyEnv: source.envName }) };
+	const extra = { "./shared.js": secretMock };
+	const ctx = { get: () => undefined };
+	const { resolveTavilyOptions } = await loadModule("lib/tavily.js", () => {}, { TAVILY_BASE_URL: "https://env.test" }, undefined, extra);
+	const tavily = resolveTavilyOptions(ctx, { apiKey: "old", tavilyApiKey: "", baseURL: "https://old.test", tavilyBaseURL: "", mode: "keyless", tavilyMode: "keyed", tavilyIncludeAnswer: false, includeAnswer: true });
+	assert.equal(tavily.apiKey, "");
+	assert.equal(tavily.baseURL, "https://env.test");
+	assert.equal(tavily.mode, "keyed");
+	assert.equal(tavily.includeAnswer, false);
+	const { resolveDeepseekOptions } = await loadModule("lib/deepseek.js", () => {}, {}, undefined, extra);
+	const deepseek = resolveDeepseekOptions(ctx, { model: "old", deepseekModel: "new", apiVersion: "old-version", deepseekApiVersion: "new-version", maxTokens: 100, deepseekMaxTokens: 200, maxUses: 1, deepseekMaxUses: 2 });
+	assert.equal(deepseek.model, "new");
+	assert.equal(deepseek.apiVersion, "new-version");
+	assert.equal(deepseek.maxTokens, 200);
+	assert.equal(deepseek.maxUses, 2);
+	const { resolveBraveOptions } = await loadModule("lib/brave.js", () => {}, {}, undefined, extra);
+	const brave = resolveBraveOptions(ctx, { country: "us", braveCountry: "cn", searchLang: "en", braveSearchLang: "zh-hans", proxy: "http://old.test", braveProxy: "" });
+	assert.equal(brave.country, "cn");
+	assert.equal(brave.searchLang, "zh-hans");
+	assert.equal(brave.proxy, "");
+});
+
+test("Host dispatch uses isolated prefixed Brave and Scavio settings", async () => {
+	const schemaField = { default() { return this; }, volatile() { return this; }, role() { return this; }, step() { return this; }, min() { return this; }, max() { return this; } };
+	const schema = { object: () => ({}), string: () => schemaField, number: () => schemaField, boolean: () => schemaField };
+	const providers = await loadModule("lib/providers.js", () => {});
+	const { resolveRestProvider } = await loadModule("lib/rest.js", () => {});
+	const { apply } = await loadModule("lib/index.js", () => {}, {}, undefined, {
+		"@deepseek-ai/schemastery": { default: schema },
+		"./tavily.js": { TAVILY_DEFAULT_API_KEY_ENV: "TAVILY_API_KEY", TAVILY_DEFAULT_BASE_URL: "https://api.tavily.com", TavilySearchProvider: class {}, resolveTavilyOptions: () => ({}) },
+		"./brave.js": { BRAVE_DEFAULT_API_KEY_ENV: "BRAVE_API_KEY", BRAVE_DEFAULT_BASE_URL: "https://brave.test", BraveSearchProvider: class {}, resolveBraveOptions: () => ({}) },
+		"./deepseek.js": { DEEPSEEK_DEFAULT_API_KEY_ENV: "DEEPSEEK_API_KEY", DEEPSEEK_DEFAULT_BASE_URL: "https://deepseek.test", DeepSeekSearchProvider: class {}, resolveDeepseekOptions: () => ({}) },
+		"./usage.js": { TAVILY_USAGE_POLL_MS: 600_000, UsageTracker: class {} },
+		"./rest.js": { resolveRestProvider, RestSearchProvider: class { constructor(_id, resolve) { this.resolve = resolve; } search() { return this.resolve(); } } },
+		"./providers.js": { BUILTIN_REST_IDS: ["brave", "scavio"], REST_PROVIDERS: providers.REST_PROVIDERS, findProvider: providers.findProvider }
+	});
+	const values = { provider: "brave", country: "us", searchLang: "en", braveCountry: "gb", braveSearchLang: "en-gb", scavioCountry: "cn", scavioSearchLang: "zh-CN" };
+	const config = new Proxy({}, { get: (_target, field) => ({ get: () => values[field] }) });
+	let selected;
+	apply({ effect: () => {}, inject: () => {}, web: { registerSearchProvider: (provider) => { selected = provider; } } }, config);
+	const brave = await selected.search({ query: "test" });
+	assert.equal(brave.settings.country, "gb");
+	assert.equal(brave.settings.searchLang, "en-gb");
+	values.provider = "scavio";
+	const scavio = await selected.search({ query: "test" });
+	assert.equal(scavio.settings.country, "cn");
+	assert.equal(scavio.settings.searchLang, "zh-CN");
+	delete values.scavioCountry;
+	assert.equal((await selected.search({ query: "test" })).settings.country, "us");
 });
 
 test("Firecrawl sends array sources and caps an overlong response", async () => {

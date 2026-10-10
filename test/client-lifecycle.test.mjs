@@ -100,6 +100,84 @@ function flatten(node) {
 	return [node, ...flatten(node.props?.children)];
 }
 
+test("Tavily saves prefixed references and masks an inherited legacy literal key", async () => {
+	const writes = [];
+	const { registrations, serve, mutations, values } = setupClient({
+		provider: "tavily",
+		values: { mode: "keyed", apiKeyEnv: "OLD_TAVILY_KEY", apiKey: "inherited-key" },
+		credentialSet: async (ref, value) => { writes.push({ ref, value }); return { ok: true }; }
+	});
+	const stop = serve();
+	const section = [...registrations][0];
+	let nodes = flatten(section({}));
+	assert.equal(nodes.find((node) => node.props?.id === "ws-tavily-keyref").props.value, "OLD_TAVILY_KEY");
+	nodes.find((node) => node.props?.id === "ws-tavily-keyref").props.onChange({ target: { value: "NEW_TAVILY_KEY" } });
+	nodes.find((node) => node.props?.id === "ws-tavily-key").props.onChange({ target: { value: "new-key" } });
+	nodes = flatten(section({}));
+	nodes.find((node) => node.type === "button" && node.props.children.includes("save")).props.onClick({ preventDefault() {} });
+	await new Promise(setImmediate);
+	assert.deepEqual(writes, [{ ref: "NEW_TAVILY_KEY", value: "new-key" }]);
+	assert.equal(values.tavilyApiKeyEnv, "NEW_TAVILY_KEY");
+	assert.equal(values.tavilyApiKey, "");
+	assert.equal(values.apiKey, "inherited-key");
+	assert.equal(mutations[0].ops.some((op) => op.path[0] === "apiKey"), false);
+	stop();
+});
+
+test("Scavio exposes independent region settings without changing Brave", async () => {
+	const { registrations, serve, values } = setupClient({ provider: "scavio", values: { country: "us", searchLang: "en" } });
+	const stop = serve();
+	const section = [...registrations][0];
+	let nodes = flatten(section({}));
+	assert.equal(nodes.find((node) => node.props?.id === "ws-scavio-country").props.value, "us");
+	nodes.find((node) => node.props?.id === "ws-scavio-country").props.onChange({ target: { value: "cn" } });
+	nodes = flatten(section({}));
+	nodes.find((node) => node.type === "button" && node.props.children.includes("save")).props.onClick({ preventDefault() {} });
+	await new Promise(setImmediate);
+	assert.equal(values.scavioCountry, "cn");
+	assert.equal(values.country, "us");
+	assert.equal(values.braveCountry, undefined);
+	stop();
+});
+
+test("resetting a legacy shared country restores Brave and preserves Scavio", async () => {
+	const { registrations, serve, values } = setupClient({
+		provider: "brave", values: { country: "us" }, user: { country: "us" }, base: { country: "" }
+	});
+	const stop = serve();
+	const section = [...registrations][0];
+	let nodes = flatten(section({}));
+	const field = nodes.find((node) => node.props?.className === "dshws_field" && flatten(node).some((child) => child.props?.id === "ws-country"));
+	flatten(field).find((node) => node.props?.className === "dshws_reset").props.onClick();
+	nodes = flatten(section({}));
+	nodes.find((node) => node.type === "button" && node.props.children.includes("save")).props.onClick({ preventDefault() {} });
+	await new Promise(setImmediate);
+	assert.equal(values.country, undefined);
+	assert.equal(values.braveCountry, undefined);
+	assert.equal(values.scavioCountry, "us");
+	stop();
+});
+
+test("saving visible DeepSeek settings preserves the hidden API version", async () => {
+	const { registrations, serve, mutations, values } = setupClient({
+		values: { apiVersion: "custom-protocol-version", model: "old-model" }
+	});
+	const stop = serve();
+	const section = [...registrations][0];
+	let nodes = flatten(section({}));
+	assert.equal(nodes.some((node) => node.props?.id === "ws-apiversion"), false);
+	nodes.find((node) => node.props?.id === "ws-model").props.onChange({ target: { value: "new-model" } });
+	nodes = flatten(section({}));
+	nodes.find((node) => node.type === "button" && node.props.children.includes("save")).props.onClick({ preventDefault() {} });
+	await new Promise(setImmediate);
+	assert.equal(values.deepseekModel, "new-model");
+	assert.equal(values.model, "old-model");
+	assert.equal(values.apiVersion, "custom-protocol-version");
+	assert.equal(mutations.length, 1);
+	assert.equal(mutations[0].ops.some((op) => (op.path[0] === "apiVersion" || op.path[0] === "deepseekApiVersion")), false);
+	stop();
+});
+
 test("settings entry follows Host namespace and failed key update keeps the draft", async () => {
 	const { registrations, serve } = setupClient();
 	assert.equal(registrations.size, 0);

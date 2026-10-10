@@ -8,6 +8,16 @@
 
 - 自定义网页搜索图标：采用与官方图标协调的蓝绿渐变和地球放大镜造型，通过包元数据提供给插件列表、详情及包含的组件。
 
+### 变更
+
+- 供应商专用配置统一增加前缀：Tavily 使用 `tavily*`，DeepSeek 搜索选项使用 `deepseek*`，Brave 使用 `brave*`；Scavio 的地区与语言选项独立为 `scavioCountry`、`scavioSearchLang`。通用的 `provider`、`maxResults` 保持不变。
+- 保留旧字段兼容读取；新字段优先，包括显式空字符串和 `false`。设置卡保存新名称，恢复默认时处理当前 Profile 的旧别名，并保留另一引擎依赖的旧共享地区或语言值。
+- 设置卡隐藏 API 协议版本输入框，保留 `deepseekApiVersion` 高级配置与旧 `apiVersion` 兼容。
+
+### 文档
+
+- README 提供英文主版与独立中文版，补充插件优势、设置卡配置步骤和配置范围；优先建议在卡片中选择 DeepSeek（官方），需要恢复 Harness 内置插件时再关闭整个组合包。
+
 ## [0.5.0] - 2026-10-09
 
 ### 新增

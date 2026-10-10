@@ -26,4 +26,3 @@
       name: dsh-web-search-plugin
       config:
         provider: deepseek-official
-        mode: keyless
