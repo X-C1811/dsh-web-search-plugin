@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-search-plugin",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Unified web search for the DeepSeek Harness seam (ctx.web): DeepSeek (official), Tavily, Brave, Serper, SerpApi, Exa, SearXNG, Scavio, and Firecrawl backends",
   "icon": "./assets/icon.svg",
   "keywords": [

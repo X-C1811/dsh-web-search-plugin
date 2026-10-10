@@ -4,6 +4,8 @@
 
 ## [未发布]
 
+## [0.5.1] - 2026-10-10
+
 ### 新增
 
 - 自定义网页搜索图标：采用与官方图标协调的蓝绿渐变和地球放大镜造型，通过包元数据提供给插件列表、详情及包含的组件。
@@ -27,7 +29,7 @@
 - DeepSeek 后端支持账号令牌认证：会话 provider 为 `deepseek-account` 时通过 `deepseekAccount.resolveToken()` 获取令牌并以 `x-dsh-auth-token` 发送，未授权时回落到 `DEEPSEEK_API_KEY`。
 - 有会话发起者时，DeepSeek 搜索在派发前记录脱敏请求到会话事件 `web/deepseek-search-llm-request`，与官方 provider 行为一致。
 - 插件列表页与详情页的标题、描述随界面语言切换：`locale/en.json` 与 `locale/zh.json`，经 `"./locale/*.json"` 导出（与官方 bundle 同一机制）。卡片内文案由 `lib/client.js` 的 `zh` / `en` 字典提供。
-- README 面向开源使用者整理：删除仅适用于本机的排查笔记与旧个人包迁移章节，修正与实现脱节的仓库布局与安装说明。
+- README 整理：修正与实现脱节的仓库布局与安装说明。
 
 ### 移除
 
