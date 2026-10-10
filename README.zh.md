@@ -84,10 +84,12 @@ DeepSeek 官方账号会话（provider 为 `deepseek-account`）会优先尝试�
 
 ### 接口地址
 
-| 键 | 默认值 | 地址规则 |
+下表列出未指定自定义地址或环境变量覆盖时实际使用的地址。通常无需填写接口地址；Tavily 和 DeepSeek 也支持通过启动环境变量指定地址。
+
+| 键 | 默认使用地址 | 地址规则 |
 |---|---|---|
-| `deepseekBaseURL` | 空字符串 | DeepSeek Anthropic 兼容 Messages 基址：非空配置 → 启动环境中的 `DEEPSEEK_SEARCH_BASE_URL` → `https://api.deepseek.com/anthropic/v1`；追加 `/messages` |
-| `tavilyBaseURL` | 空字符串 | Tavily 基址：非空配置 → 启动环境中的 `TAVILY_BASE_URL` → `https://api.tavily.com`；追加 `/search` |
+| `deepseekBaseURL` | `https://api.deepseek.com/anthropic/v1` | DeepSeek Anthropic 兼容 Messages 基址：非空配置 → 启动环境中的 `DEEPSEEK_SEARCH_BASE_URL` → 默认地址；追加 `/messages` |
+| `tavilyBaseURL` | `https://api.tavily.com` | Tavily 基址：非空配置 → 启动环境中的 `TAVILY_BASE_URL` → 默认地址；追加 `/search` |
 | `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | 完整网页搜索接口，不再追加路径 |
 | `serperBaseURL` | `https://google.serper.dev` | 追加 `/search` |
 | `serpapiBaseURL` | `https://serpapi.com` | 追加 `/search.json` |

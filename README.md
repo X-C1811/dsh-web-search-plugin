@@ -84,10 +84,12 @@ Credential writes and profile configuration saves happen in separate steps. Fail
 
 ### Endpoints
 
-| Key | Default | Address rules |
+The table lists the addresses used when no custom endpoint or environment override is provided. Normally, you do not need to enter an endpoint. Tavily and DeepSeek also support endpoint overrides through the launching environment.
+
+| Key | Default address | Address rules |
 |---|---|---|
-| `deepseekBaseURL` | Empty string | DeepSeek Anthropic-compatible Messages base: nonempty configuration → `DEEPSEEK_SEARCH_BASE_URL` in the launching environment → `https://api.deepseek.com/anthropic/v1`; appends `/messages` |
-| `tavilyBaseURL` | Empty string | Tavily base: nonempty configuration → `TAVILY_BASE_URL` in the launching environment → `https://api.tavily.com`; appends `/search` |
+| `deepseekBaseURL` | `https://api.deepseek.com/anthropic/v1` | DeepSeek Anthropic-compatible Messages base: nonempty configuration → `DEEPSEEK_SEARCH_BASE_URL` in the launching environment → default address; appends `/messages` |
+| `tavilyBaseURL` | `https://api.tavily.com` | Tavily base: nonempty configuration → `TAVILY_BASE_URL` in the launching environment → default address; appends `/search` |
 | `braveBaseURL` | `https://api.search.brave.com/res/v1/web/search` | Full web search endpoint; no path is appended |
 | `serperBaseURL` | `https://google.serper.dev` | Appends `/search` |
 | `serpapiBaseURL` | `https://serpapi.com` | Appends `/search.json` |
