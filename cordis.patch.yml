@@ -8,6 +8,9 @@
 # profile's own cordis.patch.yml still wins if it later overrides `web`. The
 # seam id is `dsh-web-search`; the backend (DeepSeek / Tavily / Brave) is the
 # plugin's own `provider` setting.
+# The settings page can independently override searchProvider to
+# deepseek-search-api and fetchProvider to deepseek-fetch-api on rc.2 Hosts.
+# Keep these defaults for existing profiles; API choices are opt-in.
 - id: web
   name: '@deepseek-ai/dsh-web'
   config:

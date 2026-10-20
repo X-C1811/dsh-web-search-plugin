@@ -21,7 +21,7 @@ function setupClient(options = {}) {
 	};
 	vm.runInNewContext(readFileSync(new URL("../lib/client.js", import.meta.url), "utf8"), sandbox);
 	const react = {
-		createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
+		createElement: (type, props, ...children) => ({ type, props: { ...props, children: children.length ? children : props?.children } }),
 		useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot()
 	};
 	const store = {
@@ -62,12 +62,39 @@ function setupClient(options = {}) {
 			return true;
 		}
 	};
+	const writes = [];
+	const external = (ns, initial) => {
+		const spec = options.scopes?.[ns] ?? {};
+		const current = { ...initial, ...spec.value };
+		const user = { ...spec.user };
+		let revision = spec.revision ?? 7;
+		const listeners = new Set();
+		return {
+			value: current, user,
+			getSnapshot: () => ({ status: spec.status ?? "ready", writable: spec.writable ?? true, value: current, user, base: spec.base ?? initial, revision }),
+			subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); },
+			async mutate(ops, expected) {
+				writes.push({ ns, ops, revision: expected });
+				if (spec.mutate && await spec.mutate(ops, expected) !== true) return false;
+				assert.equal(expected, revision);
+				for (const op of ops) {
+					if (op.op === "set") { current[op.path[0]] = op.value; user[op.path[0]] = op.value; }
+					else { delete user[op.path[0]]; current[op.path[0]] = (spec.base ?? initial)[op.path[0]]; }
+				}
+				revision++;
+				listeners.forEach(listener => listener());
+				return true;
+			}
+		};
+	};
+	const web = external("web", { searchProvider: "dsh-web-search", fetchProvider: "http" });
+	const api = external("web-deepseek-api", { apiKeyEnv: "DEEPSEEK_API_KEY", baseURL: "https://api.deepseek.com/v1/tools", count: 10 });
 	let serve;
 	const context = {
 		effect: (start) => start(),
 		locale: { bind: () => (key) => key, register: () => () => {} },
 		configForms: {
-			get: () => scope,
+			get: ns => ns === "web" ? web : ns === "web-deepseek-api" ? api : scope,
 			whileServed: (_namespaces, register) => { serve = register; return () => {}; }
 		},
 		remote: {
@@ -89,7 +116,7 @@ function setupClient(options = {}) {
 		}
 	};
 	apply(context);
-	return { registrations, serve, mutations, values };
+	return { registrations, serve, mutations, values, web, api, writes, draft };
 }
 
 function flatten(node) {
@@ -99,6 +126,201 @@ function flatten(node) {
 	if (typeof node.type === "function") return flatten(node.type(node.props));
 	return [node, ...flatten(node.props?.children)];
 }
+
+function card(options = {}) {
+	const env = setupClient(options);
+	const stop = env.serve();
+	const section = [...env.registrations][0];
+	const nodes = () => flatten(section({}));
+	const edit = (id, value) => nodes().find(node => node.props?.id === id).props.onChange({ target: { value } });
+	const save = async () => {
+		nodes().find(node => node.type === "button" && node.props.children.includes("save")).props.onClick({ preventDefault() {} });
+		await new Promise(setImmediate);
+	};
+	return { ...env, nodes, edit, save, stop };
+}
+
+test("Search API selection uses official namespace and leaves HTTP fetch and Messages configuration intact", async () => {
+	const c = card({ values: { deepseekBaseURL: "https://messages.test/anthropic/v1", deepseekModel: "legacy" } });
+	c.edit("ws-provider", "deepseek-search-api");
+	c.edit("ws-api-base", "https://search.test/v1/tools");
+	c.edit("ws-api-count", "6");
+	assert.equal(c.web.value.searchProvider, "dsh-web-search");
+	assert.equal(c.nodes().filter(node => node.props?.id === "ws-api-key").length, 1);
+	await c.save();
+	assert.equal(c.web.value.searchProvider, "deepseek-search-api");
+	assert.equal(c.web.value.fetchProvider, "http");
+	assert.equal(c.api.value.baseURL, "https://search.test/v1/tools");
+	assert.equal(c.api.value.count, 6);
+	assert.equal(c.values.deepseekBaseURL, "https://messages.test/anthropic/v1");
+	assert.equal(c.values.deepseekModel, "legacy");
+	assert.deepEqual(c.writes.map(write => write.ns), ["web-deepseek-api", "web"]);
+	assert.equal(c.nodes().find(node => node.props?.id === "ws-provider").props.value, "deepseek-search-api");
+	c.stop();
+});
+
+test("Fetch API can be combined with Serper; returning to HTTP preserves Search API and its shared configuration", async () => {
+	const c = card({ provider: "serper" });
+	c.edit("ws-fetch-provider", "deepseek-fetch-api");
+	c.edit("ws-api-base", "https://fetch.test/api/v1/tools");
+	await c.save();
+	assert.equal(c.values.provider, "serper");
+	assert.equal(c.web.value.searchProvider, "dsh-web-search");
+	assert.equal(c.web.value.fetchProvider, "deepseek-fetch-api");
+	c.edit("ws-provider", "deepseek-search-api");
+	assert.equal(c.nodes().filter(node => node.props?.id === "ws-api-key").length, 1);
+	assert.ok(c.nodes().includes("apiShared"));
+	await c.save();
+	c.edit("ws-fetch-provider", "http");
+	await c.save();
+	assert.equal(c.web.value.searchProvider, "deepseek-search-api");
+	assert.equal(c.web.value.fetchProvider, "http");
+	assert.equal(c.api.value.baseURL, "https://fetch.test/api/v1/tools");
+	c.edit("ws-provider", "serper");
+	await c.save();
+	assert.equal(c.web.value.searchProvider, "dsh-web-search");
+	assert.equal(c.values.provider, "serper");
+	c.stop();
+});
+
+test("API key uses the staged reference, clears only the official literal and never persists a secret draft", async () => {
+	const credentials = [];
+	const c = card({ provider: "serper", values: { deepseekApiKey: "old-messages-key" },
+		scopes: { "web-deepseek-api": { value: { apiKey: "old-api-literal" } } },
+		credentialSet: async (ref, value) => { credentials.push({ ref, value }); return { ok: true }; }
+	});
+	c.edit("ws-fetch-provider", "deepseek-fetch-api");
+	c.edit("ws-api-keyref", "NEW_API_KEY");
+	c.edit("ws-api-key", "secret-api-value");
+	assert.equal(JSON.stringify([...c.draft.values()]).includes("secret-api-value"), false);
+	await c.save();
+	assert.deepEqual(credentials, [{ ref: "NEW_API_KEY", value: "secret-api-value" }]);
+	assert.equal(c.api.value.apiKey, "");
+	assert.equal(c.api.value.apiKeyEnv, "NEW_API_KEY");
+	assert.equal(c.values.deepseekApiKey, "old-messages-key");
+	c.stop();
+});
+
+test("refused API configuration never switches providers and retains the draft for retry", async () => {
+	let allow = false;
+	const c = card({ scopes: { "web-deepseek-api": { mutate: async () => allow } } });
+	c.edit("ws-provider", "deepseek-search-api");
+	c.edit("ws-api-base", "https://retry.test/v1/tools");
+	await c.save();
+	assert.equal(c.web.value.searchProvider, "dsh-web-search");
+	assert.ok(c.nodes().includes("partialFailed"));
+	assert.equal(c.nodes().find(node => node.props?.id === "ws-api-base").props.value, "https://retry.test/v1/tools");
+	allow = true;
+	await c.save();
+	assert.equal(c.web.value.searchProvider, "deepseek-search-api");
+	assert.equal(c.api.value.baseURL, "https://retry.test/v1/tools");
+	c.stop();
+});
+
+test("refused provider selection after accepted API settings can be retried without overwriting that namespace", async () => {
+	let allow = false;
+	const c = card({ scopes: { web: { mutate: async () => allow } } });
+	c.edit("ws-provider", "deepseek-search-api");
+	c.edit("ws-fetch-provider", "deepseek-fetch-api");
+	c.edit("ws-api-base", "https://partial.test/v1/tools");
+	await c.save();
+	assert.equal(c.api.value.baseURL, "https://partial.test/v1/tools");
+	assert.equal(c.web.value.searchProvider, "dsh-web-search");
+	assert.ok(c.nodes().includes("partialFailed"));
+	allow = true;
+	await c.save();
+	assert.equal(c.writes.filter(write => write.ns === "web-deepseek-api").length, 1);
+	assert.equal(c.web.value.searchProvider, "deepseek-search-api");
+	assert.equal(c.web.value.fetchProvider, "deepseek-fetch-api");
+	c.stop();
+});
+
+test("a concurrent web edit during credential saving is fenced and retry preserves the other provider", async () => {
+	let finish;
+	const c = card({ credentialSet: () => new Promise(resolve => { finish = () => resolve({ ok: true }); }) });
+	c.edit("ws-provider", "deepseek-search-api");
+	c.edit("ws-api-key", "staged-key");
+	const saving = c.save();
+	assert.equal(c.nodes().find(node => node.props?.id === "ws-fetch-provider").props.disabled, true);
+	await c.web.mutate([{ op: "set", path: ["fetchProvider"], value: "concurrent-fetch" }], 7);
+	finish();
+	await saving;
+	assert.equal(c.web.value.searchProvider, "dsh-web-search");
+	assert.equal(c.web.value.fetchProvider, "concurrent-fetch");
+	assert.ok(c.nodes().includes("partialFailed"));
+	const retry = c.save();
+	finish();
+	await retry;
+	assert.equal(c.web.value.searchProvider, "deepseek-search-api");
+	assert.equal(c.web.value.fetchProvider, "concurrent-fetch");
+	c.stop();
+});
+
+test("missing API namespace disables both new choices while existing search remains editable", async () => {
+	const c = card({ scopes: { "web-deepseek-api": { status: "unavailable", writable: false } } });
+	assert.equal(c.nodes().find(node => node.type === "option" && node.props.value === "deepseek-search-api").props.disabled, true);
+	assert.equal(c.nodes().find(node => node.type === "option" && node.props.value === "deepseek-fetch-api").props.disabled, true);
+	c.edit("ws-model", "existing-search-model");
+	await c.save();
+	assert.equal(c.values.deepseekModel, "existing-search-model");
+	assert.equal(c.writes.length, 0);
+	c.stop();
+});
+
+test("invalid API count or reference prevents credentials and provider writes", async () => {
+	let credentialWrites = 0;
+	const c = card({ credentialSet: async () => { credentialWrites++; return { ok: true }; } });
+	c.edit("ws-provider", "deepseek-search-api");
+	c.edit("ws-api-count", "51");
+	c.edit("ws-api-key", "new-secret");
+	await c.save();
+	assert.equal(credentialWrites, 0);
+	assert.equal(c.writes.length, 0);
+	c.edit("ws-api-count", "10");
+	c.edit("ws-api-keyref", "INVALID-REF");
+	await c.save();
+	assert.equal(credentialWrites, 0);
+	assert.equal(c.writes.length, 0);
+	c.stop();
+});
+
+test("different staged keys for one shared DeepSeek reference are rejected before any write", async () => {
+	let writes = 0;
+	const c = card({ credentialSet: async () => { writes++; return { ok: true }; } });
+	c.edit("ws-deepseek-key", "messages-key");
+	c.edit("ws-fetch-provider", "deepseek-fetch-api");
+	c.edit("ws-api-key", "different-api-key");
+	await c.save();
+	assert.equal(writes, 0);
+	assert.equal(c.writes.length, 0);
+	assert.ok(c.nodes().includes("credentialConflict"));
+	c.stop();
+});
+
+test("rejected API key write leaves provider selection and settings unchanged", async () => {
+	const c = card({ credentialSet: async () => ({ ok: false }) });
+	c.edit("ws-provider", "deepseek-search-api");
+	c.edit("ws-api-key", "failed-key");
+	await c.save();
+	assert.equal(c.writes.length, 0);
+	assert.equal(c.web.value.searchProvider, "dsh-web-search");
+	assert.equal(c.nodes().find(node => node.props?.id === "ws-api-key").props.value, "failed-key");
+	assert.ok(c.nodes().includes("partialFailed"));
+	c.stop();
+});
+
+test("discard keeps current providers and API settings; a custom fetch provider is preserved", async () => {
+	const c = card({ scopes: { web: { value: { fetchProvider: "custom-fetch" } } } });
+	assert.equal(c.nodes().find(node => node.props?.id === "ws-fetch-provider").props.value, "custom-fetch");
+	c.edit("ws-provider", "deepseek-search-api");
+	c.edit("ws-fetch-provider", "http");
+	c.edit("ws-api-base", "https://discard.test/v1/tools");
+	c.nodes().find(node => node.type === "button" && node.props.children.includes("discard")).props.onClick({ preventDefault() {} });
+	assert.equal(c.nodes().find(node => node.props?.id === "ws-provider").props.value, "deepseek-official");
+	assert.equal(c.nodes().find(node => node.props?.id === "ws-fetch-provider").props.value, "custom-fetch");
+	assert.equal(c.writes.length, 0);
+	c.stop();
+});
 
 test("Tavily saves prefixed references and masks an inherited legacy literal key", async () => {
 	const writes = [];
@@ -195,7 +417,7 @@ test("settings entry follows Host namespace and failed key update keeps the draf
 	save.props.onClick({ preventDefault() {} });
 	await new Promise(setImmediate);
 	nodes = flatten(section({}));
-	assert.ok(nodes.includes("saveFailed"));
+	assert.ok(nodes.includes("partialFailed"));
 	assert.ok(nodes.includes("unsaved"));
 	stop();
 	assert.equal(registrations.size, 0);
@@ -243,7 +465,7 @@ test("rejected configuration mutation keeps the draft and reports failure", asyn
 	await new Promise(setImmediate);
 	nodes = flatten(section({}));
 	assert.equal(mutations.length, 1);
-	assert.ok(nodes.includes("saveFailed"));
+	assert.ok(nodes.includes("partialFailed"));
 	assert.ok(nodes.includes("unsaved"));
 	assert.equal(nodes.find((node) => node.props?.id === "ws-model").props.value, "replacement-model");
 	stop();

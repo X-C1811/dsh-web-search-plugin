@@ -2,20 +2,21 @@
 
 English | [中文](./README.zh.md)
 
-A web search plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that gives your agent more search options through Harness's existing `web_search` tool. Choose from **nine providers** and manage engines, API keys, and search options in **Settings → Web search**.
+A web search plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that gives your agent more search options through Harness's existing `web_search` tool. **Settings → Web search** contains two independent sections: **Search engines** (ten choices) and **Web retrieval** (local HTTP or DeepSeek Fetch API), with one Save action.
 
 ## Why use this plugin?
 
-- **Avoid an extra DeepSeek model call for search.** The eight third-party backends call search APIs directly instead of DeepSeek's official model-backed search endpoint. This avoids the additional DeepSeek model token usage for that search request. (Your conversation and the model's processing of search results still use tokens, and search providers may charge their own fees or credits.)
+- **Avoid an extra DeepSeek model call for search.** DeepSeek Search API and the eight third-party backends call search APIs directly instead of DeepSeek's official model-backed search endpoint. This avoids the additional DeepSeek model token usage for that search request. (Your conversation and the model's processing of search results still use tokens, and search providers may charge their own fees or credits.)
 - **Configure everything in a settings card.** Switch engines, enter keys, and adjust result limits in **Settings → Web search**, then save. Changes take effect on the next search without restarting the plugin or editing YAML.
 - **Choose the search service that fits your needs.** Use Google results through Serper, semantic search through Exa, or a self-hosted SearXNG instance. Tavily's keyless mode lets you try search without an account or API key.
-- **Return to built-in search with one switch.** Turn off the entire `dsh-web-search-plugin` bundle in the sidebar's **Plugins** page to remove its search overrides and restore Harness's built-in DeepSeek search under the standard profile configuration. See [Disable or uninstall](#disable-or-uninstall).
+- **Keep existing engines and settings.** Messages search and third-party engines remain available. Search and retrieval are selected independently; see [Disable or uninstall](#disable-or-uninstall) before removing saved provider overrides.
 
-**The default engine is still DeepSeek (official).** To avoid the extra official search model call, select a third-party engine in the settings card after installation and save your changes. Selecting DeepSeek (official) uses the official search API and may incur model invocation charges.
+**The default engine is still DeepSeek Messages search.** To avoid the extra official search model call, select **DeepSeek Search API** or a third-party engine in the settings card after installation and save your changes. Selecting DeepSeek Messages search uses the official search API and may incur model invocation charges.
 
 ## Supported providers
 
-- **DeepSeek (official, default)** — Uses DeepSeek's Anthropic-compatible Messages API with the native search tool type `web_search_20250305`. Supports account tokens or `DEEPSEEK_API_KEY`. Each search sends a model request and may incur model invocation charges.
+- **DeepSeek Search API** — Reuses rc.2's official `deepseek-search-api`. Direct `/v1/tools/search` requests without an auxiliary model turn. Its `count` is 1–50 (default 10), further bounded by the calling tool; it does not use this plugin's `maxResults`.
+- **DeepSeek Messages search (installation default)** — Uses DeepSeek's Anthropic-compatible Messages API with the native search tool type `web_search_20250305`. Supports account tokens or `DEEPSEEK_API_KEY`. Each search sends a model request and may incur model invocation charges.
 - **Tavily** — Supports `keyless` access (free, rate-limited, no account required) or `keyed` access (`TAVILY_API_KEY`, Bearer token). The settings card shows a quota bar in keyed mode.
 - **Brave Search** — Calls `GET https://api.search.brave.com/res/v1/web/search` with the `X-Subscription-Token` header (credential name: `BRAVE_API_KEY`). Each search is one HTTP request and does not consume a model turn. The settings card displays Capacity and monthly quota from response headers.
 - **Serper** — Google results via `POST /search`, using the `X-API-KEY` header (credential name: `SERPER_API_KEY`).
@@ -29,7 +30,7 @@ For DuckDuckGo results, choose a SearXNG instance that aggregates DuckDuckGo. Du
 
 ## Requirements
 
-- DeepSeek Harness `0.2.0-rc.2` or a compatible `0.2.x` release
+- Verified with DeepSeek Harness `0.2.1-rc.2`. New Search / Fetch options require the Host's `web` and `web-deepseek-api` configuration namespaces. Compatible `0.2.0-rc.2` Hosts retain existing engines; unavailable API options are disabled.
 - Node.js `^22.19.0` or `>=24.0.0`
 - pnpm, used by `dsh plugin` to install the plugin into a profile
 
@@ -44,22 +45,37 @@ dsh plugin --profile web add dsh-web-search-plugin
 After installation, configure the plugin in the Harness Web UI:
 
 1. Open **Settings → Web search** and find the plugin's settings card. The sidebar's **Plugins** page controls whether the bundle is enabled; engine settings live in this card.
-2. Choose a search engine. For direct API search without an extra DeepSeek model call, select Tavily, Brave, Serper, SerpApi, Exa, SearXNG, Scavio, or Firecrawl.
+2. Choose a search engine. For direct API search without an extra DeepSeek model call, select DeepSeek Search API, Tavily, Brave, Serper, SerpApi, Exa, SearXNG, Scavio, or Firecrawl.
 3. Enter the engine's API key if required. Engines that require a key show “Get API key ↗”, which opens the official dashboard. For Tavily without a key, choose `keyless`; for SearXNG, set an instance URL with JSON search enabled. These two keyless options do not show a key dashboard link. Existing credentials can be reused, such as `BRAVE_API_KEY` for Brave.
-4. Adjust the result limit and other options, then click **Save**. The next search uses the saved engine and settings.
+4. Under **Web retrieval**, independently select local HTTP (default) or DeepSeek Fetch API.
+5. Adjust parameters and click **Save** at the bottom. Unsaved changes remain drafts; the next operation uses the saved settings.
 
 > For installation from a local source checkout, including Windows cross-drive considerations, see [Development → Local installation and verification](#local-installation-and-verification).
 
 ## Configuration
 
-For normal use, configure the plugin in **Settings → Web search**. The card shows options for the selected engine and saves ordinary settings to the current profile's `dsh-web-search-plugin` configuration. The tables below describe the underlying configuration, including advanced fields hidden from the card; not every field is shown at once.
+For normal use, configure the plugin in **Settings → Web search**. The card shows options for the selected engine and retrieval method. Existing engine settings use `dsh-web-search-plugin`; new API settings use `web-deepseek-api`, and provider selection uses `web` in the current profile. The tables below include advanced fields hidden from the card.
+
+### New Search API and web retrieval
+
+The page reuses the official providers rather than registering duplicate implementations. Selecting the new Search API sets `web.searchProvider: deepseek-search-api`. Selecting an existing engine restores `dsh-web-search` and saves the plugin's `provider`. Retrieval independently selects `web.fetchProvider: http` or `deepseek-fetch-api`. Existing custom fetch providers are shown and preserved until explicitly changed.
+
+Search API and Fetch API share the official `web-deepseek-api` namespace: `apiKeyEnv` (default `DEEPSEEK_API_KEY`), `baseURL` (default `https://api.deepseek.com/v1/tools`), and the credential. Only one API configuration is shown when both are selected. Messages endpoint/model/key settings remain separate. API `count` controls returned results, not requests or spending. The official advanced `sendOriginalQuestion` setting defaults to true: search sends the triggering question with whitespace normalized and at most 128 characters. It can be disabled in the official configuration; this page preserves it.
+
+Recommended: **DeepSeek Search API + local HTTP**. Search avoids an auxiliary model call. Local HTTP requests the target from the device running DSH without calling paid Fetch. DeepSeek Fetch is optional remote Markdown retrieval; it does not guarantee access to every site. Local HTTP does not execute JavaScript. Tool results still consume main-conversation tokens. No automatic engine or paid retrieval fallback occurs.
+
+See [official billing](https://api-docs.deepseek.com/zh-cn/guides/search/#计费) for current successful-request prices and conditions. Estimated costs are not presented as an actual bill.
+
+Save writes credentials, then engine/API parameters, then the edited search/retrieval selections in a single `web` mutation. Each namespace has its own revision: this is not a transaction across namespaces. A later refusal leaves accepted writes in place, reports possible partial saving, and retains the draft for review and retry. Editing is locked during saving; Discard never writes settings.
+
+The tables below describe the original nine plugin backends; new Search API configuration is described above.
 
 ### General settings
 
 | Key | Default | Meaning and scope |
 |---|---|---|
 | `provider` | `deepseek-official` | Active engine: `deepseek-official`, `tavily`, `brave`, `serper`, `serpapi`, `exa`, `searxng`, `scavio`, or `firecrawl`. Each request uses only the selected engine, with no automatic failover to another engine on error. Unknown values fall back to official DeepSeek |
-| `maxResults` | `8` | Maximum returned sources for all engines, from 1–20, also capped by the caller's `request.maxResults`. SearXNG and Scavio send no request-level count parameter; their results are truncated after retrieval and URL deduplication. The upstream response determines how many results are actually available |
+| `maxResults` | `8` | Maximum returned sources for the original nine plugin backends (excluding the independent new Search API), from 1–20, also capped by the caller's `request.maxResults`. SearXNG and Scavio send no request-level count parameter; their results are truncated after retrieval and URL deduplication. The upstream response determines how many results are actually available |
 
 ### Keys and credential references
 
@@ -110,7 +126,7 @@ Clearing a text input or using “Restore default” in the card normally remove
   </thead>
   <tbody>
     <tr>
-      <td rowspan="4"><strong>DeepSeek (official)</strong></td>
+      <td rowspan="4"><strong>DeepSeek Messages search</strong></td>
       <td><code>deepseekModel</code></td>
       <td><code>deepseek-flash</code></td>
       <td>Model used only for the DeepSeek search request; does not change the conversation's chat model. Must be supported by the target endpoint</td>
@@ -190,7 +206,7 @@ The startup environment variable `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` select
 
 ## Quotas
 
-- **DeepSeek (official)**: No quota bar. Search still makes a model request, with usage subject to your account or API billing.
+- **DeepSeek Messages search**: No quota bar. Search still makes a model request, with usage subject to your account or API billing.
 - **Tavily keyless**: No quota bar; access is free and rate-limited.
 - **Tavily keyed**: Requests `include_usage` during searches and accumulates credits for the current credential in memory. The Host periodically calls `GET /usage`, and the settings card supports manual refresh. Manual refreshes must be at least 10 seconds apart; automatic reconciliation is not subject to this limit. The quota comes from `account.current_plan` / `plan_limit`; usage is the larger of the local total for the current credential and the remote value. Changing keys clears the previous account's usage and triggers immediate reconciliation. Tavily quota data is no longer persisted to disk.
 - **Brave**: No usage/spending endpoint. Dashboard **Capacity** represents the per-second window from response headers (for example, 50 requests/second). A monthly limit of `0` means unlimited requests, not an exhausted quota. Billing credits are available only in the [Brave API dashboard](https://api-dashboard.search.brave.com/).
@@ -198,15 +214,15 @@ The startup environment variable `DSH_WEB_SEARCH_PROVIDER=dsh-web-search` select
 
 ## Disable or uninstall
 
-### Switch to DeepSeek (official) first
+### Switch to DeepSeek Messages search first
 
-If you only want to use official search again, select **DeepSeek (official)** in **Settings → Web search** and save. There is no need to disable or uninstall this plugin. The next search uses the official search API through this plugin and may still incur model invocation charges.
+If you only want to use official search again, select **DeepSeek Messages search** in **Settings → Web search** and save. There is no need to disable or uninstall this plugin. The next search uses the official search API through this plugin and may still incur model invocation charges.
 
 ### Disable and restore built-in search
 
 Use the following steps when you want to stop using this plugin and restore Harness's original search plugin. Selecting this plugin's DeepSeek engine and restoring the original plugin are separate operations.
 
-Open **Plugins** in the sidebar and turn off the **entire `dsh-web-search-plugin` bundle**. Under the standard Harness profile configuration, this removes the bundle's search-provider override and its override disabling the built-in DeepSeek plugin, restoring built-in search without uninstalling the package. You can turn the bundle back on later.
+Open **Plugins** in the sidebar and turn off the **entire `dsh-web-search-plugin` bundle**. This removes its composition layer and re-enables the built-in Messages search plugin. Explicit provider settings saved through this page remain in the profile: review `web.searchProvider` and `web.fetchProvider` and remove the overrides to restore profile defaults. You can turn the bundle back on later.
 
 Use the bundle's main switch: disabling only an individual component inside the bundle leaves its other configuration overrides in place. Profiles with configuration hot reload apply the change immediately; otherwise, restart Harness.
 
@@ -220,11 +236,11 @@ To remove the installed package as well, run:
 dsh plugin --profile web remove dsh-web-search-plugin
 ```
 
-The same checks for manually added overrides apply after uninstallation. If you explicitly selected `dsh-web-search`, remove that override to use the profile default, or set `web.searchProvider` back to `deepseek-official`.
+The same checks for manually added overrides apply after uninstallation. Explicit `web` and `web-deepseek-api` settings survive disabling or uninstalling the bundle. To restore standard profile defaults, review and remove saved search/retrieval overrides. Re-enable the built-in `web-search-deepseek` before restoring Messages search; retrieval can return to `http`.
 
 ## How it works
 
-The plugin registers a single `WebSearchProvider` with the stable ID `dsh-web-search` through `ctx.web`, following the same provider contract as `@deepseek-ai/dsh-web-search-deepseek` (`inject: ['web']` and `ctx.web.registerSearchProvider`). Switching internal engines does not require changing `web.searchProvider`. Results are normalized to `WebSearchResult` (optional `content` and `sources[]`) and deduplicated by URL. All configuration fields use `volatile()`, so saved settings are read without restarting the plugin.
+The plugin registers a single `WebSearchProvider` with the stable ID `dsh-web-search` through `ctx.web`, following the same provider contract as `@deepseek-ai/dsh-web-search-deepseek` (`inject: ['web']` and `ctx.web.registerSearchProvider`). The original nine engines share this provider; selecting the new Search API switches to the official provider, independently of retrieval. Results are normalized to `WebSearchResult` (optional `content` and `sources[]`) and deduplicated by URL. All configuration fields use `volatile()`, so saved settings are read without restarting the plugin.
 
 This package is a **bundle**. The `dsh.bundle.patch` declaration points to `cordis.patch.yml`, which adds the Host entry, selects `dsh-web-search`, and disables the built-in `web-search-deepseek` Host plugin while the bundle is enabled. The plugin's internal `deepseek-official` engine option is distinct from its registered `dsh-web-search` ID. Disabling the entire bundle removes this patch layer; disabling only its Host entry does not. Without a bundle declaration, `dsh plugin add` only adds the dependency and does not mount the plugin.
 
@@ -284,7 +300,7 @@ dsh plugin --profile web install
 
 `file:` is a snapshot: after source changes, copy the files again with robocopy, run `install`, and restart DSH. If you change the package's `files` field, pnpm may consider the snapshot unchanged and skip the update; remove `node_modules/dsh-web-search-plugin` before reinstalling in that case.
 
-Use `dsh --profile web --dump-config` to verify that the composition tree includes `dsh-web-search-plugin` and that `web.searchProvider` is `dsh-web-search`.
+Use `dsh --profile web --dump-config` to verify that the composition tree includes `dsh-web-search-plugin`. `web.searchProvider` is `dsh-web-search` for the original engines or `deepseek-search-api` for the new API; independently verify `web.fetchProvider` is `http` or the explicitly selected Fetch provider.
 
 ### Syntax checks
 
@@ -295,7 +311,7 @@ npm test
 
 The client bundle must retain the `window.__ModuleLoader__.load({ id, factory })` wire format: it is loaded by `dsh-client-modules`, not a bundler. It must export both `apply` and `inject` (`slots`, `locale`, `remote`, `remote.credentials`, `configForms`).
 
-The configuration card is hosted in **Settings → Web search** (`settings.section`, `id: "web-search"`). Its data comes from `ctx.configForms.get("dsh-web-search-plugin")`, and registration is conditional through `configForms.whileServed([namespace], register)`. When the Host does not serve this namespace, the card is not registered.
+The configuration card is hosted in **Settings → Web search** (`settings.section`, `id: "web-search"`). It combines the public ConfigForms for `dsh-web-search-plugin`, `web`, and `web-deepseek-api`. Registration follows the plugin namespace through `configForms.whileServed([namespace], register)`; absent API configuration disables only the new choices. No Host-module imports are added to the client bundle.
 
 The plugin does not show configuration on the plugin detail page (`plugins.bundle.config`).
 

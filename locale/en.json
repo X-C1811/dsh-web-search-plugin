@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Web search",
-    "description": "Unified web search for the DeepSeek Harness seam (ctx.web): DeepSeek (official), Tavily, Brave, Serper, SerpApi, Exa, SearXNG, Scavio, and Firecrawl. Switch engines from settings."
+    "description": "Search engines and web retrieval in one page: DeepSeek Search API, Messages, eight third-party engines, local HTTP and optional DeepSeek Fetch API."
   }
 }
