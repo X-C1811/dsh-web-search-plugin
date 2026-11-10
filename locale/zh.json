@@ -1,6 +1,7 @@
 {
   "meta": {
     "title": "网页搜索",
-    "description": "在一个页面独立配置搜索引擎与网页抓取：DeepSeek Search API、Messages、8 个第三方引擎、本地 HTTP 和可选 DeepSeek Fetch API。"
+    "description": "在一个页面独立配置搜索引擎与网页抓取：DeepSeek Search API、Messages、8 个第三方引擎、本地 HTTP 和可选 DeepSeek Fetch API。",
+    "detail": "assets/detail/zh.md"
   }
 }

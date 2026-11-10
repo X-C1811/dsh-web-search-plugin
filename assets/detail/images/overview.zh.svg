@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="460" viewBox="0 0 960 460" role="img" aria-labelledby="title desc" lang="zh">
+<title id="title">搜索与抓取，各自选择</title><desc id="desc">在「设置 → 网页搜索」中配置，统一保存. 下一次搜索或抓取使用已保存的设置. 功能示意 · 非实际界面截图</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#f1f8ff"/><stop offset="1" stop-color="#ecfaf4"/></linearGradient><linearGradient id="accent" x2="1" y2="1"><stop stop-color="#2563eb"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs>
+<rect width="960" height="460" rx="24" fill="url(#bg)"/>
+<g font-family="Microsoft YaHei, sans-serif" fill="#163b46">
+<rect x="32" y="32" width="7" height="54" rx="3.5" fill="url(#accent)"/>
+<text x="56" y="57" font-size="28" font-weight="700">搜索与抓取，各自选择</text><text x="56" y="85" font-size="16" fill="#506a75">在「设置 → 网页搜索」中配置，统一保存</text>
+<rect x="32" y="116" width="438" height="210" rx="18" fill="#fff" stroke="#d8e6ec"/>
+<rect x="490" y="116" width="438" height="210" rx="18" fill="#fff" stroke="#d8e6ec"/>
+<circle cx="65" cy="153" r="15" fill="#e8f1ff"/><text x="65" y="159" font-size="16" text-anchor="middle" font-weight="700" fill="#2563eb">1</text>
+<text x="91" y="160" font-size="22" font-weight="600">搜索引擎</text><text x="56" y="191" font-size="15" fill="#607480">10 个选项 · 按需填写凭据</text>
+<rect x="56" y="214" width="390" height="38" rx="9" fill="#eef5ff"/><text x="72" y="239" font-size="17" fill="#245fa3">直接调用搜索 API</text>
+<text x="56" y="291" font-size="17" >DeepSeek Messages 搜索（默认）</text>
+<circle cx="523" cy="153" r="15" fill="#e4f7ef"/><text x="523" y="159" font-size="16" text-anchor="middle" font-weight="700" fill="#0d8477">2</text>
+<text x="549" y="160" font-size="22" font-weight="600">网页抓取</text><text x="514" y="191" font-size="15" fill="#607480">独立于搜索引擎</text>
+<rect x="514" y="214" width="390" height="38" rx="9" fill="#eaf8f2"/><text x="530" y="239" font-size="17" fill="#087b6d">本地 HTTP（默认）</text><text x="514" y="291" font-size="17" >DeepSeek Fetch API</text>
+<path d="M251 326v21h458v-21M480 347v16" fill="none" stroke="#91b6b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="414" y="363" width="132" height="44" rx="12" fill="url(#accent)"/><text x="480" y="391" font-size="18" fill="#fff" text-anchor="middle" font-weight="600">保存</text>
+<text x="564" y="390" font-size="15" fill="#48626e">下一次搜索或抓取使用已保存的设置</text><text x="32" y="435" font-size="12" fill="#617d87">功能示意 · 非实际界面截图</text>
+</g></svg>

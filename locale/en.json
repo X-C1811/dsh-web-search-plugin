@@ -1,6 +1,7 @@
 {
   "meta": {
     "title": "Web search",
-    "description": "Search engines and web retrieval in one page: DeepSeek Search API, Messages, eight third-party engines, local HTTP and optional DeepSeek Fetch API."
+    "description": "Search engines and web retrieval in one page: DeepSeek Search API, Messages, eight third-party engines, local HTTP and optional DeepSeek Fetch API.",
+    "detail": "assets/detail/en.md"
   }
 }

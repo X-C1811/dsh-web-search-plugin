@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import vm from "node:vm";
+import { REST_PROVIDERS } from "../lib/providers.js";
 import { SUPPLIER_CONFIG_ALIASES, resolveSupplierConfig } from "../lib/config.js";
 
 const root = new URL("../", import.meta.url);
@@ -22,7 +23,7 @@ test("prefixed fields preserve legacy values and respect explicit empty/false ov
 	assert.equal(current.scavioCountry, "cn");
 });
 
-async function loadModule(file, fetchImpl, environment = {}, now = () => Date.now(), extraMocks = {}) {
+async function loadModule(file, fetchImpl, environment = {}, now = () => Date.now(), extraMocks = {}, processEnvironment = {}) {
 	class WebError extends Error {
 		constructor(message, code, options) { super(message, options); this.code = code; }
 	}
@@ -31,10 +32,11 @@ async function loadModule(file, fetchImpl, environment = {}, now = () => Date.no
 		URLSearchParams,
 		fetch: fetchImpl,
 		Date: class extends Date { static now() { return now(); } },
-		process: { env: {} },
+		process: { env: processEnvironment },
 		setTimeout: () => 1
 	});
 	const shared = {
+		apiKeyReady: async (options) => (options.apiKey?.length ?? 0) > 0 || await options.apiKeyReady?.() === true,
 		MAX_RESULTS_CAP: 20,
 		USER_AGENT: "test",
 		abortable: (operation, signal) => signal === undefined ? operation : new Promise((resolve, reject) => {
@@ -51,6 +53,7 @@ async function loadModule(file, fetchImpl, environment = {}, now = () => Date.no
 		throwIfSearchAborted: (signal) => { if (signal?.aborted) throw new WebError("Search aborted", "WEB_ABORTED"); }
 	};
 	const mocks = {
+		"@deepseek-ai/dsh-credentials": { credentialRef: (name) => name },
 		"./config.js": { SUPPLIER_CONFIG_ALIASES, resolveSupplierConfig },
 		"@deepseek-ai/dsh-web": { WebError },
 		"@deepseek-ai/dsh-launch-environment": { launchEnvironmentOf: () => ({ get: (key) => environment[key] === undefined ? undefined : { value: environment[key] } }) },
@@ -84,7 +87,7 @@ test("an inactive engine's invalid credential reference cannot break the selecte
 		"@deepseek-ai/schemastery": { default: schema },
 		"./tavily.js": { TAVILY_DEFAULT_API_KEY_ENV: "TAVILY_API_KEY", TAVILY_DEFAULT_BASE_URL: "https://tavily.test", TavilySearchProvider: class {}, resolveTavilyOptions: unused },
 		"./brave.js": { BRAVE_DEFAULT_API_KEY_ENV: "BRAVE_API_KEY", BRAVE_DEFAULT_BASE_URL: "https://brave.test", BraveSearchProvider: class {}, resolveBraveOptions: unused },
-		"./deepseek.js": { DEEPSEEK_DEFAULT_API_KEY_ENV: "DEEPSEEK_API_KEY", DEEPSEEK_DEFAULT_BASE_URL: "https://deepseek.test", DeepSeekSearchProvider: class { available() { return true; } }, resolveDeepseekOptions: () => ({}) },
+		"./deepseek.js": { DEEPSEEK_DEFAULT_API_KEY_ENV: "DEEPSEEK_API_KEY", DEEPSEEK_DEFAULT_BASE_URL: "https://deepseek.test", DeepSeekSearchProvider: class { available() { return true; } ready(route) { return route === "deepseek-account"; } }, resolveDeepseekOptions: () => ({}) },
 		"./usage.js": { TAVILY_USAGE_POLL_MS: 600_000, UsageTracker: class {} },
 		"./rest.js": { RestSearchProvider: class {}, resolveRestProvider: unused },
 		"./providers.js": { BUILTIN_REST_IDS: ["tavily", "serper"], REST_PROVIDERS: [], findProvider: unused }
@@ -94,6 +97,8 @@ test("an inactive engine's invalid credential reference cannot break the selecte
 	let selected;
 	apply({ effect: () => {}, inject: () => {}, web: { registerSearchProvider: (provider) => { selected = provider; } } }, config);
 	assert.equal(selected.available(), true);
+	assert.equal(await selected.ready("deepseek-account"), true);
+	assert.equal(await selected.ready("other"), false);
 });
 
 test("supplier option resolvers prefer prefixed fields over legacy configuration", async () => {
@@ -343,4 +348,112 @@ test("Tavily ignores persisted usage and an old account's late response", async 
 	releaseOld({ account: { current_plan: "free", plan_limit: 100, plan_usage: 80 } });
 	await oldRefresh;
 	assert.equal(usage.snapshot().tavily.used, 3);
+});
+
+async function readinessModules(environment = {}, processEnvironment = {}) {
+	const noNetwork = () => { throw new Error("readiness must not contact an endpoint"); };
+	const shared = await loadModule("lib/shared.js", noNetwork, environment, undefined, {}, processEnvironment);
+	const extra = { "./shared.js": shared };
+	const rest = await loadModule("lib/rest.js", noNetwork, environment, undefined, extra);
+	const deepseek = await loadModule("lib/deepseek.js", noNetwork, environment, undefined, extra);
+	return { ...shared, ...rest, ...deepseek };
+}
+
+test("readiness inspects credential presence without resolving stored secrets or caching it", async () => {
+	const { resolveSecret, apiKeyReady } = await readinessModules();
+	let configured = false;
+	let descriptions = 0;
+	const credentials = {
+		describe: async (ref) => { assert.equal(ref, "TEST_KEY"); descriptions++; return { configured }; },
+		resolve: () => { throw new Error("readiness read a secret"); }
+	};
+	const ctx = { get: (name) => name === "credentials" ? credentials : undefined };
+	const options = resolveSecret(ctx, { envName: "TEST_KEY" });
+	assert.equal(await apiKeyReady(options), false);
+	configured = true;
+	assert.equal(await apiKeyReady(options), true);
+	configured = false;
+	assert.equal(await apiKeyReady(options), false);
+	assert.equal(descriptions, 3);
+	assert.equal(await apiKeyReady(resolveSecret(ctx, { envName: "TEST_KEY", literal: "literal" })), true);
+	assert.equal(descriptions, 3, "a literal key takes priority over an unreadable credential store");
+});
+
+test("readiness follows launch/process fallbacks and treats unreadable stores as unavailable", async () => {
+	const env = { LAUNCH_KEY: "launch-value", EMPTY_KEY: "" };
+	const processEnv = { PROCESS_KEY: "process-value" };
+	const { resolveSecret, apiKeyReady } = await readinessModules(env, processEnv);
+	for (const credentials of [undefined, { describe: async () => ({ configured: false }) }]) {
+		const ctx = { get: () => credentials };
+		for (const [ref, expected] of [["LAUNCH_KEY", true], ["PROCESS_KEY", true], ["EMPTY_KEY", false], ["ABSENT_KEY", false]]) {
+			assert.equal(await apiKeyReady(resolveSecret(ctx, { envName: ref })), expected, ref);
+		}
+	}
+	const broken = { get: () => ({ describe: async () => { throw new Error("unreadable store"); } }) };
+	assert.equal(await apiKeyReady(resolveSecret(broken, { envName: "LAUNCH_KEY" })), false);
+	assert.equal(await apiKeyReady({ resolveApiKey: async () => "direct-provider-key" }), true);
+	assert.equal(await apiKeyReady({ resolveApiKey: async () => { throw new Error("unreadable"); } }), false);
+});
+
+test("all REST engines gate keyed modes and preserve Tavily keyless and SearXNG", async () => {
+	const { RestSearchProvider, resolveRestProvider } = await readinessModules();
+	let configured = false;
+	let descriptions = 0;
+	const ctx = { get: () => ({ describe: async () => { descriptions++; return { configured }; } }) };
+	for (const row of REST_PROVIDERS) {
+		const keyedModes = row.id === "tavily" ? [false, true] : [false];
+		for (const keyed of keyedModes) {
+			const provider = new RestSearchProvider(row.id, () => resolveRestProvider(ctx, row, { config: {}, settings: {}, keyed }));
+			configured = false;
+			const anonymous = row.id === "searxng" || (row.id === "tavily" && !keyed);
+			const before = descriptions;
+			assert.equal(await provider.ready(), anonymous, `${row.id}, keyed=${keyed}`);
+			if (anonymous) assert.equal(descriptions, before, "keyless engines must not inspect unrelated credentials");
+			configured = true;
+			assert.equal(await provider.ready(), true, row.id);
+		}
+	}
+});
+
+test("DeepSeek readiness uses the pending account route and the exact search endpoint", async () => {
+	const { DeepSeekSearchProvider, resolveDeepseekOptions } = await readinessModules();
+	let token;
+	let keyConfigured = false;
+	let accountReads = 0;
+	let accountError = false;
+	let keyError = false;
+	let previousRoute = "deepseek-account";
+	const ctx = { get: (name) => ({
+		agents: { currentInitiator: () => ({ session: { requestContext: () => ({ provider: previousRoute }) } }) },
+		deepseekAccount: { resolveToken: async (endpoint) => {
+			accountReads++;
+			assert.equal(endpoint, "https://trusted.test/anthropic/v1/messages");
+			if (accountError) throw new Error("unreadable grant");
+			return token;
+		} },
+		credentials: { describe: async () => { if (keyError) throw new Error("unreadable key"); return { configured: keyConfigured }; } }
+	})[name] };
+	let config = { deepseekBaseURL: "https://trusted.test/anthropic/v1/", deepseekApiKeyEnv: "TEST_KEY" };
+	const provider = new DeepSeekSearchProvider(() => resolveDeepseekOptions(ctx, config));
+	token = "account-token";
+	assert.equal(await provider.ready("other"), false);
+	assert.equal(await provider.ready(undefined), false);
+	assert.equal(accountReads, 0, "a previous account request must not authorize another route");
+	previousRoute = "other";
+	assert.equal(await provider.ready("deepseek-account"), true, "the pending route can use its account without a previous account request");
+	token = undefined;
+	assert.equal(await provider.ready("deepseek-account"), false);
+	keyConfigured = true;
+	assert.equal(await provider.ready("deepseek-account"), true, "an absent account grant falls back to a key");
+	assert.equal(await provider.ready("other"), true);
+	accountError = true;
+	config = { ...config, deepseekApiKey: "literal-key" };
+	assert.equal(await provider.ready("deepseek-account"), false, "a failed account read cannot be bypassed with a key");
+	assert.equal(await provider.ready("other"), true);
+	accountError = false;
+	keyError = true;
+	config = { ...config, deepseekApiKey: "" };
+	assert.equal(await provider.ready("other"), false);
+	token = "account-token";
+	assert.equal(await provider.ready("deepseek-account"), true, "an account token does not require reading the API key store");
 });

@@ -30,8 +30,10 @@ For DuckDuckGo results, choose a SearXNG instance that aggregates DuckDuckGo. Du
 
 ## Requirements
 
-- Verified with DeepSeek Harness `0.2.1-rc.2`. New Search / Fetch options require the Host's `web` and `web-deepseek-api` configuration namespaces. Compatible `0.2.0-rc.2` Hosts retain existing engines; unavailable API options are disabled.
-- Node.js `^22.19.0` or `>=24.0.0`
+- Isolated checks use the actual dependencies of DeepSeek Harness `0.2.2-rc.1`, `0.2.2-alpha.3`, and older `0.2.1-rc.5`, covering packed installation, the Host web seam, configuration changes, and credential readiness. Supplier HTTP responses are mocked; this does not verify live accounts or the Desktop settings UI end to end.
+- New Search / Fetch options require the Host's `web` and `web-deepseek-api` configuration namespaces. The `0.2.0-rc.2` and `0.2.1-rc.2` peer ranges remain supported; unavailable API options are disabled.
+- DSH `0.2.2` RC / alpha requires Node.js `>=24.9.0`. The plugin retains Node.js `^22.19.0` or `>=24.0.0` for older Hosts.
+- Hosts with tool readiness checks hide the plugin's search tool when required credentials are missing. Tavily keyless and SearXNG remain usable without a key. DeepSeek Messages checks account credentials against the pending model route, rather than the preceding request's route; readiness does not validate keys over the network.
 - pnpm, used by `dsh plugin` to install the plugin into a profile
 
 ## Installation
@@ -271,6 +273,16 @@ cordis.patch.yml   Bundle patch: adds Host entry, sets searchProvider, disables 
 
 ## Development
 
+### Host compatibility checks
+
+Run `test/host-compatibility.mjs` against a disposable directory with a `private: true` package manifest. Install the plugin's local `.tgz` and the target Host's Web, Settings, Credentials, Launch Environment, LLM, Cordis and Schemastery dependencies using `--strict-peer-deps --ignore-scripts`.
+
+```powershell
+node test/host-compatibility.mjs "<disposable-fixture-directory>"
+```
+
+The script uses real Cordis/Web modules and the packed plugin with fake credential services and supplier HTTP. It checks loading, search, result limits, cancellation, configuration changes, keyless modes, credential updates, account routing and disposal. It does not use an existing DSH profile or verify live suppliers or browser layout.
+
 ### Local installation and verification
 
 After editing the source, install the checkout into a profile (using `web` as the example) for local verification. If the checkout and profile are on the **same drive**, you can use a relative path:
@@ -325,6 +337,12 @@ locale/zh.json    {"meta": {"title": "网页搜索", "description": "…"}}
 ```
 
 Settings card text comes from the `zh` and `en` dictionaries in `lib/client.js`. Keep their keys aligned when editing them.
+
+### Plugin detail pages
+
+DSH versions that support `meta.detail` select `assets/detail/*.md` through `locale/zh.json` or `locale/en.json` using the interface language, with images loaded from the installed package. The full README remains the usage and development reference. Other languages follow the Host language fallback chain; older Hosts continue to use the README.
+
+Image paths are relative to the detail document. When updating these pages, keep the `meta.detail` targets and image paths valid, and use `npm pack --dry-run --json` to confirm that both Markdown and images are included.
 
 ## Publishing
 

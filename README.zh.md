@@ -30,8 +30,10 @@
 
 ## 运行要求
 
-- 已验证 DeepSeek Harness `0.2.1-rc.2`。新版 Search / Fetch 需要 Host 提供 `web` 与 `web-deepseek-api` 配置；兼容的 `0.2.0-rc.2` Host 可继续使用原有引擎，不可用的新版 API 选项会禁用。
-- Node.js `^22.19.0` 或 `>=24.0.0`
+- 已在 DeepSeek Harness `0.2.2-rc.1`、`0.2.2-alpha.3` 和旧版 `0.2.1-rc.5` 的实际依赖上进行隔离验证，覆盖打包安装、Host 搜索接缝、配置切换与凭据就绪判断；供应商 HTTP 使用模拟响应，不代表真实账号联网或桌面设置页端到端验证。
+- 新版 Search / Fetch 需要 Host 提供 `web` 与 `web-deepseek-api` 配置；保留 `0.2.0-rc.2`、`0.2.1-rc.2` 依赖范围，不可用的新版 API 选项会禁用。
+- DSH `0.2.2` 的 RC / alpha 要求 Node.js `>=24.9.0`；插件在旧版 Host 上保留 Node.js `^22.19.0` 或 `>=24.0.0` 的运行范围。
+- 支持工具就绪检查的 Host 会在缺少所需凭据时隐藏插件搜索工具；Tavily keyless 与 SearXNG 无需密钥。DeepSeek Messages 按本次模型路由判断账号令牌与 API key，不使用上一轮路由预判，也不联网校验密钥有效性。
 - pnpm，用于通过 `dsh plugin` 把插件装进 profile
 
 ## 安装
@@ -271,6 +273,16 @@ cordis.patch.yml   Bundle patch：插入 Host 行、设 searchProvider、禁用�
 
 ## 开发
 
+### Host 兼容性验证
+
+`test/host-compatibility.mjs` 可对独立临时目录运行。该目录必须有标记为 `private: true` 的 `package.json`，安装本插件的本地 `.tgz` 及目标版本的 DSH Web、Settings、Credentials、Launch Environment、LLM、Cordis 和 Schemastery 依赖；安装时启用 `--strict-peer-deps --ignore-scripts`。
+
+```powershell
+node test/host-compatibility.mjs "<临时验证目录>"
+```
+
+脚本使用真实 Cordis/Web 模块和打包后的插件，模拟凭据服务与供应商 HTTP，检查加载、搜索、结果上限、取消、配置切换、免密钥模式、凭据更新、账号路由及卸载。它不使用现有 DSH profile，不验证真实供应商或浏览器布局。
+
 ### 本地安装与验证
 
 改源码后本机验证，把仓库装进某个 profile（以 `web` 为例）。**同盘**可以直接用相对路径：
@@ -325,6 +337,12 @@ locale/zh.json    {"meta": {"title": "网页搜索", "description": "…"}}
 ```
 
 卡片内的文案由 `lib/client.js` 的 `zh` / `en` 两份字典提供，改动时须保持键名对齐。
+
+### 插件详情页
+
+支持 `meta.detail` 的 DSH 会根据界面语言读取 `locale/zh.json` 或 `locale/en.json` 指定的 `assets/detail/*.md`，并加载文档旁的本地图片。完整 README 保留为使用与开发参考；未提供详情文档的语言按 Host 语言链回退，旧版 Host 继续读取 README。
+
+详情文档中的图片相对于该文档解析。更新详情时，请保持 `meta.detail` 目标及图片路径有效，并通过 `npm pack --dry-run --json` 确认 Markdown 和图片均在安装包内。
 
 ## 发布
 
