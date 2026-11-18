@@ -5,27 +5,40 @@
 #
 # `searchProvider` and the upstream `fetchProvider` are restated in full
 # because a Cordis patch replaces the targeted row's whole `config`. The
-# profile's own cordis.patch.yml still wins if it later overrides `web`. The
-# seam id is `dsh-web-search`; the backend (DeepSeek / Tavily / Brave) is the
-# plugin's own `provider` setting.
-# The settings page can independently override searchProvider to
-# deepseek-search-api and fetchProvider to deepseek-fetch-api on rc.2 Hosts.
-# Keep these defaults for existing profiles; API choices are opt-in.
+# profile's own cordis.patch.yml still wins if it later overrides `web`.
+#
+# Defaults mirror the Harness `0.2.2` defaults: the in-box `deepseek-search-api`
+# provider searches, and `http` fetches from this device. Selecting any engine
+# this bundle serves (legacy Messages, Tavily, Brave, Serper, …) switches
+# `searchProvider` back to `dsh-web-search`, this bundle's own seam id, and
+# leaves the backend to the plugin's `provider` setting.
+#
+# `deepseek-search-api` needs the in-box `web-deepseek-api` layer, which the
+# Harness ships from `0.2.1-rc.2` on. A profile without it must pick another
+# engine on the settings page.
 - id: web
   name: '@deepseek-ai/dsh-web'
   config:
-    searchProvider: dsh-web-search
+    searchProvider: deepseek-search-api
     fetchProvider: http
 
-# This bundle selects its own `dsh-web-search` seam provider and configures
-# DeepSeek through that provider. Disable the in-box DeepSeek host plugin so
-# the profile has one active DeepSeek configuration surface. Its provider id
-# is `deepseek-official`, distinct from this bundle's `dsh-web-search` id.
+# Disable the in-box legacy DeepSeek search plugin so the profile has one
+# active legacy Messages configuration surface: this bundle's `dsh-web-search`
+# provider with its `deepseek-official` backend. That provider id is distinct
+# from the in-box `deepseek-official` one.
 - id: web-search-deepseek
+  disabled: true
+
+# Disable the in-box "Web search & fetch" settings page. Its two seams (`web`
+# and `web-deepseek-api`) are exactly what this bundle's own page edits, and
+# showing both leaves the user with two entry points for one configuration.
+# This row is inserted by `@deepseek-ai/dsh-web-app`; the bundle layer is
+# applied after it, so the disable lands on an existing row.
+- id: ui-settings-web-search
   disabled: true
 
 - insert:
     - id: dsh-web-search-plugin
       name: dsh-web-search-plugin
       config:
-        provider: deepseek-official
+        provider: deepseek-search-api

@@ -536,3 +536,74 @@ test("invalid credential reference blocks key and configuration writes", async (
 	assert.deepEqual(writes, []);
 	stop();
 });
+
+/**
+ * The `0.2.2-rc.2` Host splits `apiKey` / `apiKeyEnv` / `baseURL` into
+ * per-capability fields plus a billing choice. The card keeps one credential
+ * and one endpoint, so one edit must fan out to both capabilities, and the
+ * legacy literal-key row must disappear because the schema has no slot for it.
+ */
+test("split web-deepseek-api schema fans one card edit out to Search and Fetch", async () => {
+	const c = card({
+		scopes: { "web-deepseek-api": { value: {
+			count: 10, searchBilling: "auto", fetchBilling: "auto",
+			searchApiKeyEnv: "", fetchApiKeyEnv: "", searchBaseURL: "", fetchBaseURL: ""
+		} } }
+	});
+	c.edit("ws-provider", "deepseek-search-api");
+	assert.equal(c.nodes().filter(node => node.props?.id === "ws-api-key").length, 0, "no literal key row on the split schema");
+	assert.equal(c.nodes().filter(node => node.props?.id === "ws-webApiSearchBilling").length, 1, "billing row on the split schema");
+	c.edit("ws-api-keyref", "DSH_SPLIT_KEY");
+	c.edit("ws-api-base", "https://split.test/v1/tools");
+	c.edit("ws-webApiSearchBilling", "account");
+	await c.save();
+	const ops = c.writes.filter(write => write.ns === "web-deepseek-api").flatMap(write => write.ops);
+	const value = (key) => ops.find(op => op.path[0] === key)?.value;
+	assert.equal(value("searchApiKeyEnv"), "DSH_SPLIT_KEY");
+	assert.equal(value("fetchApiKeyEnv"), "DSH_SPLIT_KEY");
+	assert.equal(value("searchBaseURL"), "https://split.test/v1/tools");
+	assert.equal(value("fetchBaseURL"), "https://split.test/v1/tools");
+	assert.equal(value("searchBilling"), "account");
+	assert.equal(ops.some(op => ["apiKey", "apiKeyEnv", "baseURL"].includes(op.path[0])), false, "legacy keys never reach the split schema");
+	c.stop();
+});
+
+test("split schema writes the Fetch billing row when Fetch API is chosen", async () => {
+	const c = card({
+		scopes: { "web-deepseek-api": { value: {
+			count: 10, searchBilling: "auto", fetchBilling: "auto",
+			searchApiKeyEnv: "", fetchApiKeyEnv: "", searchBaseURL: "", fetchBaseURL: ""
+		} } }
+	});
+	c.edit("ws-fetch-provider", "deepseek-fetch-api");
+	assert.equal(c.nodes().filter(node => node.props?.id === "ws-webApiFetchBilling").length, 1);
+	c.edit("ws-webApiFetchBilling", "api-key");
+	await c.save();
+	const ops = c.writes.filter(write => write.ns === "web-deepseek-api").flatMap(write => write.ops);
+	assert.equal(ops.find(op => op.path[0] === "fetchBilling")?.value, "api-key");
+	c.stop();
+});
+
+test("pre-rc.2 schema keeps the literal key row and never writes a billing field", async () => {
+	const c = card({});
+	c.edit("ws-provider", "deepseek-search-api");
+	assert.equal(c.nodes().filter(node => node.props?.id === "ws-api-key").length, 1);
+	assert.equal(c.nodes().filter(node => node.props?.id === "ws-webApiSearchBilling").length, 0);
+	c.edit("ws-api-keyref", "DSH_LEGACY_KEY");
+	await c.save();
+	const ops = c.writes.filter(write => write.ns === "web-deepseek-api").flatMap(write => write.ops);
+	assert.equal(ops.find(op => op.path[0] === "apiKeyEnv")?.value, "DSH_LEGACY_KEY");
+	assert.equal(ops.some(op => /Billing/i.test(op.path[0])), false);
+	c.stop();
+});
+
+test("legacy DeepSeek keeps model and max tokens behind Advanced settings", () => {
+	const c = card({});
+	const details = c.nodes().filter(node => node.type === "details");
+	assert.equal(details.length, 1);
+	const ids = flatten(details[0]).map(node => node.props?.id).filter(Boolean);
+	assert.ok(ids.includes("ws-model") && ids.includes("ws-maxtokens"));
+	assert.equal(ids.includes("ws-maxuses"), false, "the search-count row stays visible");
+	assert.equal(c.nodes().some(node => node.props?.id === "ws-maxuses"), true);
+	c.stop();
+});

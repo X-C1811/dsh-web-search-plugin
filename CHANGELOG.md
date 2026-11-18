@@ -4,6 +4,44 @@
 
 ## [未发布]
 
+## [0.7.1] - 2026-11-18
+
+### 变更
+
+- 组合层禁用内置的「网页搜索与获取」设置页（`ui-settings-web-search`）。该页与本插件页面编辑同一对 `web` / `web-deepseek-api` 接缝，同时保留两个入口会让用户重复配置，也会让插件列表出现两个同名条目；插件启用时只保留本插件一个入口。关闭或卸载整个组合包会撤销该行，内置页面随之恢复。
+- 搜索提供方补充 `title` 与中英 `description`，provider 选择器不再显示裸 ID `dsh-web-search`。
+- 计费方式选项对齐官方措辞：自动 / 已登录的 DeepSeek 账号 / DeepSeek API Key，并按当前选择显示对应说明（需要先登录 DeepSeek 账号、使用「模型」页配置的 API Key）。
+- 指南链接文案改为「网页搜索与获取指南」。
+- 包版本与 User-Agent 更新为 `0.7.1`。
+
+## [0.7.0] - 2026-11-18
+
+### 破坏性变更
+
+- 默认搜索提供方由 DeepSeek Messages 搜索改为 **DeepSeek Search API**，与 DSH `0.2.2` 自带的「网页搜索与获取」页一致；组合包默认把 `web.searchProvider` 设为 `deepseek-search-api`。
+- 该默认需要 Host 提供 `web-deepseek-api`（DSH `0.2.1-rc.2` 起），因此移除 `0.2.0-rc.2` 的 peer 范围，保留 `0.2.1-rc.2`、`0.2.2-alpha.3`、`0.2.2-rc.4`。需要旧版搜索的 Profile 在卡片中选择 **DeepSeek（旧版）** 即可。
+
+### 新增
+
+- 设置卡新增「计费方式」下拉（自动 / 账号 / API Key，默认自动），写入官方 `searchBilling` / `fetchBilling`，说明文字与官方一致：跟随当前会话的 DeepSeek 账号或 API Key；会话用其他模型时，优先用 API Key，没有则用已登录账号。
+- 搜索与获取两个区块分别显示各自能力的计费方式；旧版 Host 没有该字段时不显示该行。
+
+### 修复
+
+- 修复 DSH `0.2.2-rc.2` 及以上「DeepSeek Search API / Fetch API」配置区保存失败：官方把 `apiKey` / `apiKeyEnv` / `baseURL` 换成按能力拆分的字段后，插件继续写旧字段会被 `dsh-settings` 拒绝（`Config field "apiKey" is not volatile`）。
+- 卡片按 Host 实际提供的 schema 自动切换：新版写 `searchApiKeyEnv` / `fetchApiKeyEnv` 与 `searchBaseURL` / `fetchBaseURL`，旧版继续写 `apiKeyEnv` / `baseURL`；新版不再渲染没有对应槽位的字面 API Key 行。
+
+### 变更
+
+- 术语与说明文字对齐官方页面：网页搜索提供方 / 网页获取提供方、DeepSeek（旧版）、本机直接获取、单次请求最多搜索次数；补充「本机直接获取」的能力边界与 Fetch API 的计费说明。
+- 提供方下拉下方改为显示当前选中提供方的一句话说明，DuckDuckGo 提示只在选择 SearXNG 时出现。
+- 旧版 DeepSeek 的「模型」「最大 token」收进「高级设置」折叠区。
+- 包版本与 User-Agent 更新为 `0.7.0`。
+
+### 兼容性
+
+- 在 `0.2.2-rc.4`、`0.2.2-rc.3`、`0.2.2-rc.1`、`0.2.2-alpha.3` 的真实依赖上验证打包安装、Host 搜索接缝、配置切换与凭据就绪判断；新增客户端用例覆盖新旧两套 `web-deepseek-api` schema 的字段映射与计费行显隐。
+
 ## [0.6.1] - 2026-11-10
 
 ### 文档

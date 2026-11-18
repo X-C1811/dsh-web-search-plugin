@@ -18,6 +18,7 @@ Thumbs.db
 .tmp/
 .npm-cache/
 .snapshots/
+*.tgz
 
 # Local-only design docs (kept on disk, not published to the remote)
 docs/

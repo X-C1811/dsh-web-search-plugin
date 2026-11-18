@@ -2,21 +2,22 @@
 
 [English](./README.md) | 中文
 
-为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的 Agent 提供更多联网搜索选择，沿用 Harness 原有的 `web_search` 工具。在 **设置 → 网页搜索** 一个入口中，分为 **搜索引擎**（10 个选项）和 **网页抓取**（本地 HTTP 或 DeepSeek Fetch API），独立选择后统一保存。
+为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的 Agent 提供更多联网搜索选择，沿用 Harness 原有的 `web_search` 工具。在 **设置 → 网页搜索** 一个入口中，分为 **网页搜索提供方**（10 个选项）和 **网页获取提供方**（本机直接获取 或 DeepSeek Fetch API），独立选择后统一保存。
 
 ## 为什么使用本插件？
 
 - **减少搜索时额外的 DeepSeek 模型调用。** 新版 DeepSeek Search API 和 8 个第三方后端直接请求搜索 API，不经过 DeepSeek 官方的模型搜索接口，因此不会产生该次搜索请求额外的 DeepSeek 模型 token 消耗。（对话本身和模型读取搜索结果仍会消耗 token，搜索服务也可能单独收取费用或扣除额度。）
-- **在设置卡片中完成配置。** 在 **设置 → 网页搜索** 中切换引擎、填写密钥、调整结果数量，保存后下一次搜索即可生效，无需重启插件或编辑 YAML。
+- **在设置卡片中完成配置。** 在 **设置 → 网页搜索** 中切换搜索与获取提供方、填写密钥、调整结果数量，保存后下一次搜索即可生效，无需重启插件或编辑 YAML。
 - **按需求选择搜索服务。** 可以通过 Serper 获取 Google 结果，使用 Exa 进行语义搜索，或接入自建 SearXNG。Tavily 的 keyless 模式无需账号和 API key，方便先体验。
-- **保留已有引擎与设置。** Messages 和第三方引擎继续可用，搜索与抓取独立选择；移除已保存的提供方覆盖前，请参考[停用或卸载](#停用或卸载)。
+- **对齐官方配置项。** 提供方名称、说明文字和默认值与 DSH 自带的 **网页搜索与获取** 页面一致：默认使用 DeepSeek Search API，抓取默认由本机直接获取。
+- **保留已有引擎与设置。** 旧版 Messages 和第三方引擎继续可用，搜索与获取独立选择；移除已保存的提供方覆盖前，请参考[停用或卸载](#停用或卸载)。
 
-**默认引擎仍为 DeepSeek Messages 搜索。** 若要避免官方搜索额外的模型调用，安装后可在设置卡片中选择 **DeepSeek Search API** 或第三方引擎并保存。选择 DeepSeek Messages 搜索时，会使用官方搜索 API，可能产生模型调用费用。
+**默认搜索提供方为 DeepSeek Search API**（与 DSH 默认一致），即复用官方 `deepseek-search-api`，不产生搜索时的辅助模型调用。若要用旧版搜索，可在卡片中选择 **DeepSeek（旧版）**；它会发起额外 Messages 模型请求，可能产生模型调用费用。
 
 ## 支持的搜索后端
 
-- **DeepSeek Search API** — 复用 DSH rc.2 的官方 `deepseek-search-api`，直接请求 `/v1/tools/search`，无辅助模型轮次。结果数使用官方 `count`（1–50，默认 10）并受调用工具上限约束，不读取本插件的 `maxResults`。
-- **DeepSeek Messages 搜索（安装默认）** — 使用 DeepSeek 的 Anthropic 兼容 Messages API，原生搜索工具类型为 `web_search_20250305`，支持账号令牌或 `DEEPSEEK_API_KEY`。每次搜索会发起模型请求，可能产生模型调用费用。
+- **DeepSeek Search API（安装默认）** — 复用 DSH 官方 `deepseek-search-api`，直接请求 `/v1/tools/search`，无辅助模型轮次。结果数使用官方 `count`（1–50，默认 10），计费方由官方 `searchBilling`（自动 / 账号 / API Key，默认自动）决定。不读取本插件的 `maxResults`。
+- **DeepSeek（旧版）** — 使用 DeepSeek 的 Anthropic 兼容 Messages API，原生搜索工具类型为 `web_search_20250305`，账号模型发起的请求用已登录账号，其他请求用 `DEEPSEEK_API_KEY`。每次搜索会发起模型请求，可能产生模型调用费用。
 - **Tavily** — `keyless`（免费、限流、无需账号）或 `keyed`（`TAVILY_API_KEY`，Bearer token）。keyed 会在设置卡显示额度进度条。
 - **Brave Search** — `GET https://api.search.brave.com/res/v1/web/search`，请求头 `X-Subscription-Token`（凭据名 `BRAVE_API_KEY`）。一次搜索就是一次 HTTP 请求，不走模型轮次；设置卡按响应头展示 Capacity / 月配额。
 - **Serper** — Google 结果（`POST /search`，头 `X-API-KEY`，凭据名 `SERPER_API_KEY`）。
@@ -30,10 +31,10 @@
 
 ## 运行要求
 
-- 已在 DeepSeek Harness `0.2.2-rc.1`、`0.2.2-alpha.3` 和旧版 `0.2.1-rc.5` 的实际依赖上进行隔离验证，覆盖打包安装、Host 搜索接缝、配置切换与凭据就绪判断；供应商 HTTP 使用模拟响应，不代表真实账号联网或桌面设置页端到端验证。
-- 新版 Search / Fetch 需要 Host 提供 `web` 与 `web-deepseek-api` 配置；保留 `0.2.0-rc.2`、`0.2.1-rc.2` 依赖范围，不可用的新版 API 选项会禁用。
+- 已在 DeepSeek Harness `0.2.2-rc.4`、`0.2.2-rc.3`、`0.2.2-rc.1`、`0.2.2-alpha.3` 和旧版 `0.2.1-rc.5` 的实际依赖上进行隔离验证，覆盖打包安装、Host 搜索接缝、配置切换与凭据就绪判断；供应商 HTTP 使用模拟响应，不代表真实账号联网或桌面设置页端到端验证。
+- 默认的 DeepSeek Search API 需要 Host 提供 `web` 与 `web-deepseek-api` 配置（DSH `0.2.1-rc.2` 起）。依赖范围为 `0.2.1-rc.2`、`0.2.2-alpha.3` 与 `0.2.2-rc.4` 及以上；缺少该层时应改选其他引擎。
 - DSH `0.2.2` 的 RC / alpha 要求 Node.js `>=24.9.0`；插件在旧版 Host 上保留 Node.js `^22.19.0` 或 `>=24.0.0` 的运行范围。
-- 支持工具就绪检查的 Host 会在缺少所需凭据时隐藏插件搜索工具；Tavily keyless 与 SearXNG 无需密钥。DeepSeek Messages 按本次模型路由判断账号令牌与 API key，不使用上一轮路由预判，也不联网校验密钥有效性。
+- 支持工具就绪检查的 Host 会在缺少所需凭据时隐藏插件搜索工具；Tavily keyless 与 SearXNG 无需密钥。DeepSeek（旧版）按本次模型路由判断账号令牌与 API key，不使用上一轮路由预判，也不联网校验密钥有效性。
 - pnpm，用于通过 `dsh plugin` 把插件装进 profile
 
 ## 安装
@@ -47,9 +48,9 @@ dsh plugin --profile web add dsh-web-search-plugin
 安装后，在 Harness Web 界面中完成配置：
 
 1. 打开 **设置 → 网页搜索**，找到本插件的设置卡片。侧栏的 **插件** 页面负责启用或停用组合包，引擎参数在设置卡片中配置。
-2. 选择搜索引擎。若要直接调用搜索 API、避免额外的 DeepSeek 模型调用，可选 DeepSeek Search API、Tavily、Brave、Serper、SerpApi、Exa、SearXNG、Scavio 或 Firecrawl。
+2. 选择网页搜索提供方。默认是 DeepSeek Search API；也可选 DeepSeek（旧版）、Tavily、Brave、Serper、SerpApi、Exa、SearXNG、Scavio 或 Firecrawl。
 3. 按需填写所选引擎的 API key，需要密钥的引擎会显示「获取 API key ↗」，点击即可打开官方控制台。Tavily 免 key 使用时选择 `keyless`；SearXNG 填写已启用 JSON 搜索的实例地址，这两种免 key 方式不显示密钥获取链接。已有凭据可以复用，例如 Brave 的 `BRAVE_API_KEY`。
-4. 在 **网页抓取** 中选择本地 HTTP（默认）或 DeepSeek Fetch API。更换搜索引擎不会更改抓取方式。
+4. 在 **网页获取提供方** 中选择本机直接获取（默认）或 DeepSeek Fetch API。更换搜索提供方不会更改获取方式。
 5. 调整参数并点击页面底部的 **保存**；保存前只修改草稿，下一次操作使用已保存配置。
 
 > 从源码仓库本地安装（含 Windows 跨盘注意事项）见 [开发 → 本地安装与验证](#本地安装与验证)。
@@ -58,13 +59,17 @@ dsh plugin --profile web add dsh-web-search-plugin
 
 日常使用在 **设置 → 网页搜索** 的卡片中配置即可。原有引擎参数保存在当前 Profile 的 `dsh-web-search-plugin`，新版 API 参数保存在 `web-deepseek-api`，提供方选择保存在 `web`。下表包含卡片中隐藏的高级字段，并非所有字段都会同时显示。
 
-### 新版 Search API 与网页抓取
+### 新版 Search API 与网页获取
 
-页面复用官方提供方，不重复注册 Search / Fetch。选择新版搜索会将 `web.searchProvider` 设为 `deepseek-search-api`；切回原有引擎则恢复 `dsh-web-search`，并保存本插件的 `provider`。`web.fetchProvider` 独立选择 `http` 或 `deepseek-fetch-api`。已有自定义抓取提供方会显示并保留，除非用户主动更改。
+页面复用官方提供方，不重复注册 Search / Fetch。安装默认的 `web.searchProvider` 即 `deepseek-search-api`；切回本插件提供的引擎时恢复 `dsh-web-search`，并保存本插件的 `provider`。`web.fetchProvider` 独立选择 `http` 或 `deepseek-fetch-api`。已有自定义获取提供方会显示并保留，除非用户主动更改。
 
-新版 Search 和 Fetch 共用 `web-deepseek-api` 命名空间中的 `apiKeyEnv`（默认 `DEEPSEEK_API_KEY`）、`baseURL`（默认 `https://api.deepseek.com/v1/tools`）和凭据。两者同时启用时只显示一份 API 配置；旧 Messages 地址、模型和密钥配置独立保留。`count` 只控制新版搜索的结果数，不是请求次数或费用上限。官方高级配置 `sendOriginalQuestion` 默认开启，搜索时会发送经规整且最多 128 字符的触发问题；可在官方配置中关闭，本页面保留该值。
+`web-deepseek-api` 在 DSH `0.2.2-rc.2` 起把凭据与地址拆成按能力分开的字段。卡片的「凭据引用名」和「基础地址」会同时写入 `searchApiKeyEnv` / `fetchApiKeyEnv` 与 `searchBaseURL` / `fetchBaseURL`；更早的 Host 仍写 `apiKeyEnv` / `baseURL`。卡片按 Host 实际提供的 schema 自动切换，不会向不存在的字段写入。
 
-推荐组合为 **DeepSeek Search API + 本地 HTTP**。Search 不发起辅助模型请求；本地 HTTP 从运行 DSH 的设备直接访问目标网站，不调用收费 Fetch API。DeepSeek Fetch 是可选的远端 Markdown 抓取，不保证能读取所有网站；本地 HTTP 不执行页面 JavaScript。工具结果交给主模型后仍占用会话 token。没有自动切换引擎或付费抓取兜底。
+「计费方式」对应官方 `searchBilling` / `fetchBilling`（自动 / 账号 / API Key，默认自动），说明文字与官方页面一致：跟随当前会话的 DeepSeek 账号或 API Key；会话用其他模型时，优先用 API Key，没有则用已登录账号。旧版 Host 没有这两个字段，卡片不显示该行。
+
+`count` 只控制新版搜索的结果数，不是请求次数或费用上限。官方高级配置 `sendOriginalQuestion` 默认开启，搜索时会发送经规整且最多 128 字符的触发问题；可在官方配置中关闭，本页面保留该值。
+
+推荐组合为 **DeepSeek Search API + 本机直接获取**，也就是安装默认值。Search 不发起辅助模型请求；本机直接获取从运行 DSH 的设备访问目标网站，不调用收费 Fetch API，可访问内网和本机但不能执行页面 JavaScript，也不支持 PDF。DeepSeek Fetch 是可选的远端 Markdown 抓取，无法访问内网和本机，不保证能读取所有网站。工具结果交给主模型后仍占用会话 token。没有自动切换引擎或付费获取兜底。
 
 [官方计费说明](https://api-docs.deepseek.com/zh-cn/guides/search/#计费)：Search / Fetch 均按成功且产生结果的请求收费；价格请以官方文档为准。界面不将估算金额当作实际账单。
 
@@ -76,7 +81,7 @@ dsh plugin --profile web add dsh-web-search-plugin
 
 | 键 | 默认值 | 含义与范围 |
 |---|---|---|
-| `provider` | `deepseek-official` | 当前搜索引擎：`deepseek-official`、`tavily`、`brave`、`serper`、`serpapi`、`exa`、`searxng`、`scavio` 或 `firecrawl`。一次请求只使用所选引擎，不会在失败后自动切换到其他引擎；未知值会回退到 DeepSeek 官方引擎 |
+| `provider` | `deepseek-search-api` | 当前搜索提供方：`deepseek-search-api`（默认，复用官方提供方，此时 `web.searchProvider` 也是它）、`deepseek-official`（旧版 Messages）、`tavily`、`brave`、`serper`、`serpapi`、`exa`、`searxng`、`scavio` 或 `firecrawl`。一次请求只使用所选后端，不会在失败后自动切换到其他后端；未知值会回退到 DeepSeek（旧版） |
 | `maxResults` | `8` | 本插件原有九个后端的返回源数量上限（不含独立的新版 Search API），范围 1–20，同时受调用方 `request.maxResults` 上限约束。SearXNG 和 Scavio 不发送请求级数量参数，只在收到响应并按 URL 去重后截取；实际可返回的数量取决于上游结果 |
 
 ### 密钥与凭据引用
@@ -128,10 +133,10 @@ DeepSeek 官方账号会话（provider 为 `deepseek-account`）会优先尝试�
   </thead>
   <tbody>
     <tr>
-      <td rowspan="4"><strong>DeepSeek Messages 搜索</strong></td>
+      <td rowspan="4"><strong>DeepSeek（旧版）</strong></td>
       <td><code>deepseekModel</code></td>
       <td><code>deepseek-flash</code></td>
-      <td>仅 DeepSeek 搜索请求使用的模型名，不会修改会话的聊天模型；需由目标端点支持</td>
+      <td>仅 DeepSeek（旧版）搜索请求使用的模型名，不会修改会话的聊天模型；需由目标端点支持；设置卡收在「高级设置」中</td>
     </tr>
     <tr>
       <td><code>deepseekApiVersion</code></td>
@@ -141,12 +146,12 @@ DeepSeek 官方账号会话（provider 为 `deepseek-account`）会优先尝试�
     <tr>
       <td><code>deepseekMaxTokens</code></td>
       <td><code>4096</code></td>
-      <td>单次 DeepSeek Messages 搜索请求的生成 token 上限，正整数；不是整个对话的 token 上限</td>
+      <td>单次 DeepSeek（旧版）搜索请求的生成 token 上限，正整数；不是整个对话的 token 上限；设置卡收在「高级设置」中</td>
     </tr>
     <tr>
       <td><code>deepseekMaxUses</code></td>
       <td><code>5</code></td>
-      <td>单次 DeepSeek Messages 请求中原生 <code>web_search</code> 工具的最大使用次数，正整数；不是引擎重试次数或结果数量</td>
+      <td>单次 DeepSeek（旧版）请求允许的服务端搜索次数上限，须为正整数，默认 5；不是引擎重试次数或结果数量</td>
     </tr>
     <tr>
       <td rowspan="4"><strong>Tavily</strong></td>
@@ -208,7 +213,7 @@ DeepSeek 官方账号会话（provider 为 `deepseek-account`）会优先尝试�
 
 ## 额度
 
-- **DeepSeek Messages 搜索**：不展示额度条。仍会发起模型搜索请求，用量按所用账号或 API 的计费规则处理。
+- **DeepSeek（旧版）**：不展示额度条。仍会发起模型搜索请求，用量按所用账号或 API 的计费规则处理。
 - **Tavily keyless**：不展示额度条，免费且有限流。
 - **Tavily keyed**：搜索时请求 `include_usage`，在内存中累加当前凭据的 credits。Host 定时调用 `GET /usage`，设置卡也可手动刷新；手动刷新之间至少间隔 10 秒，自动对账不受此限制。用 `account.current_plan` / `plan_limit` 做限额，用量取当前凭据的本地累计与远端的较大值；换 key 时清空旧账户用量并立即重新对账。旧 Tavily 额度不再持久化到磁盘。
 - **Brave**：没有 usage / 花费接口。控制台 **Capacity** 就是响应头里的每秒窗口（例如 50 次/秒）。月限额 `0` 表示不限请求次数，不是额度用完。计费 credits 只能看 [Brave API 控制台](https://api-dashboard.search.brave.com/)。
@@ -216,19 +221,19 @@ DeepSeek 官方账号会话（provider 为 `deepseek-account`）会优先尝试�
 
 ## 停用或卸载
 
-### 优先切换到 DeepSeek Messages 搜索
+### 切换回旧版 DeepSeek 搜索
 
-如果只是想重新使用官方搜索，在 **设置 → 网页搜索** 中选择 **DeepSeek Messages 搜索** 并保存即可，无需关闭或卸载本插件。下一次搜索会使用本插件接入的官方搜索 API，仍可能产生模型调用费用。
+安装默认已是官方 Search API，与 DSH 自带页面一致。若要用旧版 Messages 搜索，在 **设置 → 网页搜索** 中选择 **DeepSeek（旧版）** 并保存即可，无需关闭或卸载本插件。它会额外发起 Messages 模型请求，可能产生模型调用费用。
 
 ### 停用并恢复内置搜索
 
-若希望停用本插件、恢复 Harness 原装的搜索插件，再执行以下操作。切换到本插件中的 DeepSeek 引擎与恢复原装插件是两种不同操作。
+若希望停用本插件、恢复 Harness 原装的搜索插件与「网页搜索与获取」设置页，再执行以下操作。切换到本插件中的 DeepSeek 引擎与恢复原装插件是两种不同操作。
 
-打开侧栏 **插件** 页面，关闭 **整个 `dsh-web-search-plugin` 组合包的开关**。这会撤销该组合层，并重新启用内置 Messages 搜索插件。本页面显式保存的提供方选择仍保留在 Profile 中：需检查 `web.searchProvider` 与 `web.fetchProvider`，移除覆盖才能完整恢复 Profile 默认值；之后也可以重新打开组合包。
+打开侧栏 **插件** 页面，关闭 **整个 `dsh-web-search-plugin` 组合包的开关**。这会撤销该组合层，并重新启用内置 Messages 搜索插件与内置「网页搜索与获取」设置页。本页面显式保存的提供方选择仍保留在 Profile 中：需检查 `web.searchProvider` 与 `web.fetchProvider`，移除覆盖才能完整恢复 Profile 默认值；之后也可以重新打开组合包。
 
 请使用组合包的总开关：仅关闭包内某个组件，其他配置覆盖仍会保留。启用配置热更新的 Profile 会立即应用改动，否则需要重启 Harness。
 
-如果曾手工设置 `web.searchProvider: dsh-web-search`、`DSH_WEB_SEARCH_PROVIDER=dsh-web-search`，或另行禁用内置 DeepSeek 插件，还需移除或恢复这些覆盖。组合包开关不会撤销你单独添加的配置。
+组合包默认把 `web.searchProvider` 设为 `deepseek-search-api`（官方默认）。如果曾手工改成 `dsh-web-search`、设置 `DSH_WEB_SEARCH_PROVIDER=dsh-web-search`，或另行禁用内置 DeepSeek 插件，还需移除或恢复这些覆盖。组合包开关不会撤销你单独添加的配置。
 
 ### 卸载安装包
 
@@ -244,7 +249,7 @@ dsh plugin --profile web remove dsh-web-search-plugin
 
 本插件通过 `ctx.web` 注册一个稳定 id 为 `dsh-web-search` 的 `WebSearchProvider`，遵循与官方 `@deepseek-ai/dsh-web-search-deepseek` 相同的提供方约定（`inject: ['web']` 和 `ctx.web.registerSearchProvider`）。原有九个引擎由该提供方内部调度；选择新版 Search API 时设置卡改用官方提供方，并独立设置抓取提供方。各引擎结果规范化为 `WebSearchResult`（可选 `content` 和 `sources[]`），按 URL 去重。全部配置字段声明为 `volatile()`，保存后无需重启插件即可读取新配置。
 
-本包是 **bundle**：`dsh.bundle.patch` 声明指向 `cordis.patch.yml`，组合包启用时会插入 Host 行、选用 `dsh-web-search`，并禁用内置 `web-search-deepseek` Host 插件。本插件的内部 `deepseek-official` 引擎选项与其注册的 `dsh-web-search` id 不同。关闭整个组合包会移除这一补丁层，仅关闭其中的 Host 行则不会。没有 bundle 声明时，`dsh plugin add` 只写入依赖，插件不会挂载。
+本包是 **bundle**：`dsh.bundle.patch` 声明指向 `cordis.patch.yml`，组合包启用时会插入 Host 行、把默认搜索提供方设为 `deepseek-search-api`，并禁用内置的 `web-search-deepseek` Host 插件与 `ui-settings-web-search` 设置页——后者与本插件页面配置同一对 `web` / `web-deepseek-api` 接缝，保留两个入口只会造成重复配置。本插件的内部 `deepseek-official` 引擎选项与其注册的 `dsh-web-search` id 不同。关闭整个组合包会移除这一补丁层，仅关闭其中的 Host 行则不会。没有 bundle 声明时，`dsh plugin add` 只写入依赖，插件不会挂载。
 
 - **DeepSeek** — `POST {deepseekBaseURL}/messages`，工具 `web_search_20250305`。会话运行在 DeepSeek 官方账号路由（provider 为 `deepseek-account`）且账号服务允许该端点时，用账号令牌发 `x-dsh-auth-token`；否则回落到 API key（`x-api-key` / `authorization: Bearer`，凭据名 `DEEPSEEK_API_KEY`）。有会话发起者时，在派发前把脱敏请求记录为会话事件 `web/deepseek-search-llm-request`。
 - **纯 REST 类（Tavily / Brave / Serper / SerpApi / Exa / SearXNG / Scavio / Firecrawl）** — 由静态元数据表（`lib/providers.js`）+ 通用后端（`lib/rest.js`）驱动。请求方法 / 路径 / 查询字段名 / 鉴权（bearer / header / none / query）/ 固定参数 / 响应形态由表中的行决定。REST 后端不追加自定义会话事件。
