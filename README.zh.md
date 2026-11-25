@@ -31,8 +31,9 @@
 
 ## 运行要求
 
-- 已在 DeepSeek Harness `0.2.2-rc.5` 的实际依赖上验证打包安装、Host 搜索接缝、配置切换、跟随模式的路由选择与凭据就绪判断；更早的 RC 不再受支持。供应商 HTTP 使用模拟响应，不代表真实账号联网或桌面设置页端到端验证。
-- 依赖范围为 `0.2.2-rc.5` 及以上；`0.2.1-rc.2`、`0.2.2-alpha.3` 与 `0.2.2-rc.4` 没有按模型路由选择搜索提供方的能力，无法支持跟随模式。
+- 已在 DeepSeek Harness `0.2.2-rc.5` 与 `0.2.3-alpha.2` 的实际依赖上验证打包安装、Host 搜索接缝、配置切换、跟随模式的路由选择、凭据就绪判断，以及 `ctx.deepseekAuth` 接管授权后的请求头；更早的 RC 不再受支持。供应商 HTTP 使用模拟响应，不代表真实账号联网或桌面设置页端到端验证。
+- 依赖范围为 `0.2.2-rc.5` 及以上（含 `0.2.3-alpha`）；`0.2.1-rc.2`、`0.2.2-alpha.3` 与 `0.2.2-rc.4` 没有按模型路由选择搜索提供方的能力，无法支持跟随模式。
+- `0.2.3-alpha` 起跟随模式的 DeepSeek 路由依赖 `deepseekAuth` 服务（由 base 组合的 `deepseek-auth` 行提供）；profile 若裁剪该行，`deepseek-official` 不会注册，DeepSeek 路由会以 `WEB_PROVIDER_AMBIGUOUS` 失败。
 - DSH `0.2.2` 的 RC 要求 Node.js `>=24.9.0`；插件本身仍声明 `^22.19.0` 或 `>=24.0.0` 的运行范围。
 - 支持工具就绪检查的 Host 会在缺少所需凭据时隐藏插件搜索工具；Tavily keyless 与 SearXNG 无需密钥。DeepSeek 服务端搜索按请求携带的模型路由（`llmProvider`）判断账号令牌与 API key，不联网校验密钥有效性。
 - pnpm，用于通过 `dsh plugin` 把插件装进 profile

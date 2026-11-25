@@ -4,6 +4,26 @@
 
 ## [未发布]
 
+## [0.8.1-alpha.1] - 2026-11-25
+
+### 新增
+
+- 支持 DSH `0.2.3-alpha`。这个版本把 Cordis 升到 `4.2.0-alpha.1`、Schemastery 升到 `3.20.0-alpha.1`，并引入 `ctx.deepseekAuth` 统一 DeepSeek 的两种凭据。
+- DeepSeek 服务端后端在 `ctx.deepseekAuth` 存在时改由它授权：一次搜索按当前模型路由的顺序（账号 → API Key，或反之）取第一个可用凭据，与所在会话的计费选择保持一致。自定义端点、自定义凭据引用或字面量 key 仍走本地解析，因为 `deepseekAuth` 只服务自己连接的 origin。
+
+### 变更
+
+- `/dsh-web-search/usage` 路由显式声明 `auth: "anonymous"`。`0.2.3-alpha` 开始为 Web 路由引入认证策略，省略时默认 `required`，会让只读自身 Tavily 配额的卡片请求返回 401；`0.2.2-rc.5` 不认识该字段，空声明在两个版本上保持匿名。
+- peer 范围放宽为 `^0.2.2-rc.5 || ^0.2.3-alpha.2`（`dsh-web` / `dsh-credentials` / `dsh-settings` / `dsh-launch-environment`），`schemastery` 为 `~3.19.0 || ~3.20.0-alpha.1`，`cordis` 为 `~4.1.0 || ~4.2.0-alpha.1`。
+- 新增 `engines.dsh`：`^0.2.2-rc.5 || ^0.2.3-alpha.2`。DSH 的安装预检在存在该字段时只用它判定兼容性，不再逐个比对 `@deepseek-ai/dsh-*` peer。
+- 包版本与 User-Agent 更新为 `0.8.1-alpha.1`。
+
+### 兼容性
+
+- 在 `0.2.3-alpha.2` 的真实依赖上验证：插件加载、`resolveConfig` 解析、`apply` 激活、`ctx.web.registerSearchProvider` 注册；跟随模式下 DeepSeek 路由（`deepseek-official` / `deepseek-account`）命中内置 `deepseek-official`，其他路由与无路由命中 `deepseek-search-api`，不触发 `WEB_PROVIDER_AMBIGUOUS`；显式 pin 后 Serper、兼容 DeepSeek 后端与 Tavily keyless 运行时切换均正常。
+- `ctx.deepseekAuth` 路径覆盖七个场景：服务接管、请求字段（`consumer` / `billing` / `route` / `apiKeyHeaders`）、自定义端点不接管、自定义引用不接管、字面量 key 不接管、无服务时回退旧解析、服务抛错包装为 `WEB_PROVIDER_ERROR`。
+- 跟随模式在 `0.2.3-alpha` 依赖 `deepseekAuth` 服务：官方 `web-search-deepseek` 的注入变为 `["web", "deepseekAuth"]`，base 组合默认挂载 `deepseek-auth`。裁剪该行的 profile 会让 DeepSeek 路由退化到多提供方歧义。
+
 ## [0.8.0] - 2026-11-19
 
 ### 新增

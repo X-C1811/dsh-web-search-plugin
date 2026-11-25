@@ -498,3 +498,69 @@ test("DeepSeek readiness uses the pending account route and the exact search end
 	token = "account-token";
 	assert.equal(await provider.ready("deepseek-account"), true, "an account token does not require reading the API key store");
 });
+
+test("DeepSeek delegates to ctx.deepseekAuth only for the stock deployment and reference", async () => {
+	const { resolveDeepseekOptions } = await loadModule("lib/deepseek.js", () => {});
+	const calls = [];
+	const auth = {
+		authorize: async (request, signal) => {
+			calls.push({ request, signal });
+			return { kind: "api-key", endpoint: request.destination.url, headers: { authorization: "Bearer serviced", "x-api-key": "serviced" } };
+		}
+	};
+	const ctx = { get: (name) => (name === "deepseekAuth" ? auth : undefined) };
+
+	// 官方端点 + 默认引用：服务接管。
+	const serviced = resolveDeepseekOptions(ctx, { deepseekApiKey: "", deepseekApiKeyEnv: "DEEPSEEK_API_KEY", deepseekBaseURL: "" });
+	assert.equal(typeof serviced.authorize, "function");
+	const headers = await serviced.authorize("https://api.deepseek.com/anthropic/v1/messages", "deepseek-account");
+	// Objects created inside the vm context carry that realm's prototypes, so
+	// compare the wire shape field by field rather than by reference identity.
+	assert.equal(headers.authorization, "Bearer serviced");
+	assert.equal(headers["x-api-key"], "serviced");
+	assert.equal(calls[0].request.consumer, "dsh-web-search-plugin");
+	assert.equal(calls[0].request.billing, "auto");
+	assert.equal(calls[0].request.route, "deepseek-account");
+	assert.equal(JSON.stringify(calls[0].request.accepts), '["account","api-key"]');
+	assert.equal(JSON.stringify(calls[0].request.apiKeyHeaders), '["authorization","x-api-key"]');
+
+	// 自定义端点 / 自定义引用 / 字面量 key：本地解析继续负责。
+	assert.equal(resolveDeepseekOptions(ctx, { deepseekApiKey: "", deepseekApiKeyEnv: "DEEPSEEK_API_KEY", deepseekBaseURL: "https://proxy.test/anthropic/v1" }).authorize, undefined);
+	assert.equal(resolveDeepseekOptions(ctx, { deepseekApiKey: "", deepseekApiKeyEnv: "MY_DS_KEY", deepseekBaseURL: "" }).authorize, undefined);
+	assert.equal(resolveDeepseekOptions(ctx, { deepseekApiKey: "literal", deepseekApiKeyEnv: "DEEPSEEK_API_KEY", deepseekBaseURL: "" }).authorize, undefined);
+});
+
+test("DeepSeek without the authorization service falls back to the local credential path", async () => {
+	const { resolveDeepseekOptions } = await loadModule("lib/deepseek.js", () => {});
+	const ctx = { get: () => undefined };
+	const options = resolveDeepseekOptions(ctx, { deepseekApiKey: "", deepseekApiKeyEnv: "DEEPSEEK_API_KEY", deepseekBaseURL: "" });
+	assert.equal(typeof options.authorize, "function", "the callback exists so a late-mounted service is still honored");
+	assert.equal(await options.authorize("https://api.deepseek.com/anthropic/v1/messages", "deepseek-official"), undefined);
+});
+
+test("a serviced authorization supplies the request headers and failures stay provider errors", async () => {
+	const { DeepSeekSearchProvider } = await loadModule("lib/deepseek.js", async (url, init) => {
+		captured = init.headers;
+		return {
+			ok: true,
+			json: async () => ({ content: [{ type: "web_search_tool_result", content: [{ type: "web_search_result", url: "https://serviced.test" }] }] })
+		};
+	});
+	let captured;
+	const base = {
+		baseURL: "https://api.deepseek.com/anthropic/v1",
+		model: "test-model",
+		apiVersion: "2023-06-01",
+		maxTokens: 100,
+		maxUses: 1,
+		maxResults: 8
+	};
+	const serviced = new DeepSeekSearchProvider(() => ({ ...base, authorize: async () => ({ authorization: "Bearer serviced" }) }));
+	const result = await serviced.search({ query: "test" });
+	assert.equal(result.sources.length, 1);
+	assert.equal(captured.authorization, "Bearer serviced");
+	assert.equal(captured["x-api-key"], undefined, "the local key must not be sent once the service authorized");
+
+	const rejected = new DeepSeekSearchProvider(() => ({ ...base, authorize: async () => { throw new Error("INVALID_CREDENTIAL"); } }));
+	await assert.rejects(rejected.search({ query: "test" }), (error) => error.code === "WEB_PROVIDER_ERROR" && /INVALID_CREDENTIAL/u.test(error.message));
+});

@@ -30,8 +30,9 @@ For DuckDuckGo results, choose a SearXNG instance that aggregates DuckDuckGo. Du
 
 ## Requirements
 
-- Isolated checks use the actual dependencies of DeepSeek Harness `0.2.2-rc.5`, covering packed installation, the Host web seam, configuration changes, follow-mode selection, and credential readiness. Earlier release candidates are no longer supported. Supplier HTTP responses are mocked; this does not verify live accounts or the Desktop settings UI end to end.
-- Peer ranges require `0.2.2-rc.5` and later. `0.2.1-rc.2`, `0.2.2-alpha.3`, and `0.2.2-rc.4` cannot select a search provider by model route, so follow mode cannot work there.
+- Isolated checks use the actual dependencies of DeepSeek Harness `0.2.2-rc.5` and `0.2.3-alpha.2`, covering packed installation, the Host web seam, configuration changes, follow-mode selection, credential readiness, and the request headers `ctx.deepseekAuth` releases. Earlier release candidates are no longer supported. Supplier HTTP responses are mocked; this does not verify live accounts or the Desktop settings UI end to end.
+- Peer ranges require `0.2.2-rc.5` and later, including `0.2.3-alpha`. `0.2.1-rc.2`, `0.2.2-alpha.3`, and `0.2.2-rc.4` cannot select a search provider by model route, so follow mode cannot work there.
+- From `0.2.3-alpha` on, follow mode's DeepSeek route needs the `deepseekAuth` service, which the base composition's `deepseek-auth` row provides. A profile that prunes that row leaves `deepseek-official` unregistered, and DeepSeek routes then fail with `WEB_PROVIDER_AMBIGUOUS`.
 - DSH `0.2.2` RC requires Node.js `>=24.9.0`. The plugin itself still declares `^22.19.0` or `>=24.0.0`.
 - Hosts with tool readiness checks hide the plugin's search tool when required credentials are missing. Tavily keyless and SearXNG remain usable without a key. DeepSeek server-side search reads the route the search request carries (`llmProvider`); readiness does not validate keys over the network.
 - pnpm, used by `dsh plugin` to install the plugin into a profile
