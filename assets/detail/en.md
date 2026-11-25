@@ -7,8 +7,8 @@ Give your DeepSeek Harness agent more ways to search the web through the familia
 ## Choose how to search
 
 - **Call a search API directly**: DeepSeek Search API, Tavily, Brave Search, Serper, SerpApi, Exa, SearXNG, Scavio, or Firecrawl.
-- **Keep the official default**: DeepSeek Search API, ready after install with no auxiliary model call per search.
-- **Use legacy search instead**: DeepSeek (legacy), where models on the account route use the signed-in account and every other request uses the API key.
+- **Keep the official default (recommended)**: follow the conversation model. DeepSeek models use server-side search and every other model uses DeepSeek Search API, ready after install.
+- **Pin server-side search**: every model uses DeepSeek server-side search, where models on the account route use the signed-in account and every other request uses the API key.
 - **Try without a key**: choose Tavily `keyless`, or a SearXNG instance with JSON output enabled. Public services may apply rate limits.
 
 ## Get started in three steps
@@ -17,11 +17,11 @@ Give your DeepSeek Harness agent more ways to search the web through the familia
 2. Choose a web search provider and supply credentials when needed. Under **Web fetch provider**, independently choose local fetch (the default) or DeepSeek Fetch API.
 3. Click **Save**. The next search or retrieval uses the saved settings.
 
-The default search provider is **DeepSeek Search API**, matching DSH's own page. Billing for both new and legacy DeepSeek can be Automatic, Account, or API key. New API options are available only when the Host provides the required configuration.
+The default **follows the conversation model**, matching DSH `0.2.2-rc.5`: DeepSeek models use server-side search (no per-search charge, model tokens apply) and every other model uses DeepSeek Search API (billed per search). You can also pin any engine in the card. Billing for both Search API and server-side DeepSeek can be Automatic, Account, or API key. New API options are available only when the Host provides the required configuration.
 
 ## Costs and credentials
 
-Direct search API calls do not make an additional DeepSeek search model request, but the search service charges separately, paid by the account or API key chosen under Billing. Your conversation and the model reading search results still consume tokens. DeepSeek (legacy) makes a model request and may incur model charges. Local fetch is free and reaches the intranet and this machine, but runs no JavaScript and cannot read PDFs. Check the provider's terms for DeepSeek Fetch API charges.
+Direct search API calls do not make an additional DeepSeek search model request, but the search service charges separately, paid by the account or API key chosen under Billing. Your conversation and the model reading search results still consume tokens. DeepSeek server-side search makes a model request: there is no per-search charge, but it may incur model charges. Local fetch is free and reaches the intranet and this machine, but runs no JavaScript and cannot read PDFs. Check the provider's terms for DeepSeek Fetch API charges.
 
 Engines that require a key provide an API key link in settings. Enter your key and save; the plugin uses DSH credential management. Keyless access still has service limits.
 

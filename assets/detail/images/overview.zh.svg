@@ -8,9 +8,9 @@
 <rect x="32" y="116" width="438" height="210" rx="18" fill="#fff" stroke="#d8e6ec"/>
 <rect x="490" y="116" width="438" height="210" rx="18" fill="#fff" stroke="#d8e6ec"/>
 <circle cx="71" cy="153" r="15" fill="#e8f1ff"/><text x="65" y="159" font-size="16" text-anchor="middle" font-weight="700" fill="#2563eb">1</text>
-<text x="96" y="160" font-size="22" font-weight="600">网页搜索提供方</text><text x="56" y="191" font-size="15" fill="#607480">10 个选项 · 按需填写凭据</text>
-<rect x="46" y="214" width="400" height="38" rx="9" fill="#eef5ff"/><text x="56" y="239" font-size="17" fill="#245fa3">DeepSeek Search API（默认）</text>
-<text x="56" y="291" font-size="17" >DeepSeek（旧版）</text>
+<text x="96" y="160" font-size="22" font-weight="600">网页搜索提供方</text><text x="56" y="191" font-size="15" fill="#607480">11 个选项 · 按需填写凭据</text>
+<rect x="46" y="214" width="400" height="38" rx="9" fill="#eef5ff"/><text x="56" y="239" font-size="17" fill="#245fa3">跟随会话模型（默认）</text>
+<text x="56" y="291" font-size="17" >Search API / 服务端搜索 / 8 个引擎</text>
 <circle cx="529" cy="153" r="15" fill="#e4f7ef"/><text x="523" y="159" font-size="16" text-anchor="middle" font-weight="700" fill="#0d8477">2</text>
 <text x="554" y="160" font-size="22" font-weight="600">网页获取提供方</text><text x="514" y="191" font-size="15" fill="#607480">独立于搜索提供方</text>
 <rect x="504" y="214" width="400" height="38" rx="9" fill="#eaf8f2"/><text x="514" y="239" font-size="17" fill="#087b6d">本机直接获取（默认）</text><text x="514" y="291" font-size="17" >DeepSeek Fetch API</text>

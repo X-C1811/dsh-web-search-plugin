@@ -4,6 +4,37 @@
 
 ## [未发布]
 
+## [0.8.0] - 2026-11-19
+
+### 新增
+
+- 新增「跟随会话模型」（默认）：组合层不再固定 `web.searchProvider`，由 DSH `0.2.2-rc.5` 按模型路由选择。DeepSeek 模型请求使用内置 `deepseek-official` 服务端搜索（搜索不按次收费，每次搜索额外消耗模型 token）；其他模型以及无模型请求的搜索使用 `deepseek-search-api`。
+- 卡片提供该选项；只有 Host 组合了内置提供方时才显示，否则提示用户先固定一个引擎。
+- 卡片的 DeepSeek 端点、模型、token 上限与搜索次数现在直接读写内置 `web-search-deepseek` 命名空间，不再维护第二份配置或镜像。
+
+### 破坏性变更
+
+- peer 下限收到 `0.2.2-rc.5`：不再支持 `0.2.1-rc.2`、`0.2.2-alpha.3` 与 `0.2.2-rc.4`。这些 Host 没有按路由选择搜索提供方的能力，未固定 `searchProvider` 时会以 `WEB_PROVIDER_AMBIGUOUS` 失败。
+- 「DeepSeek 服务端搜索」改为固定内置 `deepseek-official`，不再走本插件自己的 Messages 后端。旧配置（`web.searchProvider: dsh-web-search` 且 `provider: deepseek-official`）仍由兼容后端继续服务，下一次在卡片保存时自动迁移到内置 id；插件命名空间里的 DeepSeek 参数会在迁移时带入 `web-search-deepseek`。
+- 组合层不再禁用内置 `web-search-deepseek`（跟随模式与服务端搜索都需要它注册 `deepseek-official`）。内置「网页搜索与获取」设置页仍保持禁用，配置入口仍是本插件卡片。
+- 默认搜索提供方由固定 `deepseek-search-api` 改为跟随会话模型。需要保持旧行为时，在卡片选择 **DeepSeek Search API**。
+
+### 修复
+
+- 卡片的 DeepSeek 高级字段（模型、API 版本、token 上限、搜索次数）写入 prefixed 字段，而 Host 只读取无前缀字段，导致这些设置不影响实际搜索。现在 `readSection` 同时读取两套字段，prefixed 优先、旧字段兜底。
+- DeepSeek 服务端搜索把请求携带的模型路由（`llmProvider`）传给账号令牌解析。DSH `0.2.2-rc.5` 起由 Host 在搜索请求上下发该字段，账号路由的搜索不再回退到「最近一次会话路由」而改用 API Key，与 `ready()` 的就绪判断保持一致。
+- DeepSeek Messages 结果映射优先采用结果项自带的 `snippet`，citation 摘要仅作兜底，与官方 `0.2.2-rc.5` 提供方一致；带自身摘要的结果不再丢失正文。
+
+### 变更
+
+- 文案跟随官方 `0.2.2-rc.5`：`DeepSeek（旧版）` 改为 `DeepSeek 服务端搜索` / `DeepSeek server-side search`，说明由「速度较慢」改为「搜索不按次收费，每次搜索都会额外消耗模型 token」。同步卡片、插件详情、语言包与 README。
+
+### 兼容性
+
+- 在 `0.2.2-rc.5` 的真实依赖（`dsh-web`、`dsh-web-deepseek-api`、`dsh-web-search-deepseek`、`cordis 4.1.0`、`schemastery 3.19.0`）上验证：打包安装、Host 搜索接缝、`searchReady(llmProvider)`、携带 `llmProvider` 的搜索、Messages 后端、fetch 接缝，以及未固定提供方时 DeepSeek 路由走 `/messages`、其他路由走 `/v1/tools/search`。
+- 新增回归用例覆盖路由透传、结果项 `snippet` 优先、跟随模式的写入分组、镜像与退出跟随。
+- 包版本与 User-Agent 更新为 `0.8.0`。
+
 ## [0.7.1] - 2026-11-18
 
 ### 变更

@@ -282,6 +282,47 @@ test("DeepSeek account token preflight maps failures and responds to cancellatio
 	assert.equal(dispatched, false);
 });
 
+test("a search resolves the account token with the route the request serves", async () => {
+	const { DeepSeekSearchProvider } = await loadModule("lib/deepseek.js", async () => ({
+		ok: true,
+		json: async () => ({ content: [{ type: "web_search_tool_result", content: [{ type: "web_search_result", url: "https://route.test" }] }] })
+	}));
+	const routes = [];
+	const provider = new DeepSeekSearchProvider(() => ({
+		apiKey: "test-key",
+		baseURL: "https://example.test",
+		resolveAccountToken: async (_endpoint, llmProvider) => {
+			routes.push(llmProvider);
+			return llmProvider === "deepseek-account" ? "account-token" : undefined;
+		}
+	}));
+	await provider.search({ query: "test", llmProvider: "deepseek-account" });
+	await provider.search({ query: "test" });
+	assert.deepEqual(routes, ["deepseek-account", undefined]);
+});
+
+test("a result item's own snippet wins over its citation excerpt", async () => {
+	const { DeepSeekSearchProvider } = await loadModule("lib/deepseek.js", async () => ({
+		ok: true,
+		json: async () => ({
+			content: [
+				{ type: "web_search_tool_result", content: [
+					{ type: "web_search_result", url: "https://own.test", title: "Own", snippet: "Item excerpt" },
+					{ type: "web_search_result", url: "https://cited.test", title: "Cited" }
+				] },
+				{ type: "text", text: "body", citations: [
+					{ url: "https://own.test", cited_text: "Ignored excerpt" },
+					{ url: "https://cited.test", cited_text: "Citation excerpt" }
+				] }
+			]
+		})
+	}));
+	const provider = new DeepSeekSearchProvider(() => ({ apiKey: "test-key", baseURL: "https://example.test", maxResults: 8 }));
+	const result = await provider.search({ query: "test" });
+	assert.equal(result.sources.find((source) => source.url === "https://own.test").snippet, "Item excerpt");
+	assert.equal(result.sources.find((source) => source.url === "https://cited.test").snippet, "Citation excerpt");
+});
+
 test("manual Tavily refresh is limited to one upstream request per ten seconds", async () => {
 	let requests = 0;
 	let now = 100_000;

@@ -89,12 +89,13 @@ function setupClient(options = {}) {
 	};
 	const web = external("web", { searchProvider: "dsh-web-search", fetchProvider: "http" });
 	const api = external("web-deepseek-api", { apiKeyEnv: "DEEPSEEK_API_KEY", baseURL: "https://api.deepseek.com/v1/tools", count: 10 });
+	const legacy = external("web-search-deepseek", { apiKeyEnv: "DEEPSEEK_API_KEY", baseURL: "", apiVersion: "2023-06-01", model: "deepseek-v4-flash", maxTokens: 4096, maxUses: 5 });
 	let serve;
 	const context = {
 		effect: (start) => start(),
 		locale: { bind: () => (key) => key, register: () => () => {} },
 		configForms: {
-			get: ns => ns === "web" ? web : ns === "web-deepseek-api" ? api : scope,
+			get: ns => ns === "web" ? web : ns === "web-deepseek-api" ? api : ns === "web-search-deepseek" ? legacy : scope,
 			whileServed: (_namespaces, register) => { serve = register; return () => {}; }
 		},
 		remote: {
@@ -116,7 +117,7 @@ function setupClient(options = {}) {
 		}
 	};
 	apply(context);
-	return { registrations, serve, mutations, values, web, api, writes, draft };
+	return { registrations, serve, mutations, values, web, api, legacy, writes, draft };
 }
 
 function flatten(node) {
@@ -139,6 +140,50 @@ function card(options = {}) {
 	};
 	return { ...env, nodes, edit, save, stop };
 }
+
+test("following the conversation model leaves searchProvider unset and carries DeepSeek fields into the in-box namespace", async () => {
+	const preference = { deepseekBaseURL: "https://messages.test/anthropic/v1", deepseekModel: "deepseek-flash", deepseekMaxUses: 7 };
+	const c = card({ values: { ...preference }, user: { ...preference }, scopes: { web: { base: { fetchProvider: "http" } } } });
+	c.edit("ws-provider", "__auto__");
+	await c.save();
+	assert.equal(c.web.value.searchProvider, undefined);
+	assert.equal(c.values.provider, "deepseek-official");
+	assert.equal(c.legacy.value.model, "deepseek-flash");
+	assert.equal(c.legacy.value.maxUses, 7);
+	assert.equal(c.legacy.value.baseURL, "https://messages.test/anthropic/v1");
+	assert.equal(c.legacy.value.apiKeyEnv, "DEEPSEEK_API_KEY");
+	c.stop();
+});
+
+test("editing a DeepSeek field while following writes the in-box namespace", async () => {
+	const c = card({ scopes: { web: { value: { searchProvider: undefined, fetchProvider: "http" } } } });
+	c.edit("ws-model", "deepseek-v4-pro");
+	await c.save();
+	assert.equal(c.web.value.searchProvider, undefined);
+	assert.equal(c.legacy.value.model, "deepseek-v4-pro");
+	assert.equal(c.values.deepseekModel, undefined);
+	c.stop();
+});
+
+test("picking an engine from follow mode pins the seam again", async () => {
+	const c = card({ scopes: { web: { value: { searchProvider: undefined, fetchProvider: "http" } } } });
+	c.edit("ws-provider", "serper");
+	await c.save();
+	assert.equal(c.web.value.searchProvider, "dsh-web-search");
+	assert.equal(c.values.provider, "serper");
+	c.stop();
+});
+
+test("follow mode is offered only while the in-box provider is composed", () => {
+	const c = card({ scopes: { "web-search-deepseek": { status: "unavailable", writable: false } } });
+	const options = c.nodes().filter(node => node.type === "option").map(node => node.props.value);
+	assert.equal(options.includes("__auto__"), false);
+	c.stop();
+	const offered = card();
+	const offeredOptions = offered.nodes().filter(node => node.type === "option").map(node => node.props.value);
+	assert.equal(offeredOptions.includes("__auto__"), true);
+	offered.stop();
+});
 
 test("Search API selection uses official namespace and leaves HTTP fetch and Messages configuration intact", async () => {
 	const c = card({ values: { deepseekBaseURL: "https://messages.test/anthropic/v1", deepseekModel: "legacy" } });
@@ -262,8 +307,9 @@ test("missing API namespace disables both new choices while existing search rema
 	assert.equal(c.nodes().find(node => node.type === "option" && node.props.value === "deepseek-fetch-api").props.disabled, true);
 	c.edit("ws-model", "existing-search-model");
 	await c.save();
-	assert.equal(c.values.deepseekModel, "existing-search-model");
-	assert.equal(c.writes.length, 0);
+	assert.equal(c.legacy.value.model, "existing-search-model");
+	assert.deepEqual(c.writes.map(write => write.ns), ["web-search-deepseek", "web"]);
+	assert.equal(c.web.value.searchProvider, "deepseek-official");
 	c.stop();
 });
 
@@ -381,7 +427,7 @@ test("resetting a legacy shared country restores Brave and preserves Scavio", as
 });
 
 test("saving visible DeepSeek settings preserves the hidden API version", async () => {
-	const { registrations, serve, mutations, values } = setupClient({
+	const { registrations, serve, writes, values } = setupClient({
 		values: { apiVersion: "custom-protocol-version", model: "old-model" }
 	});
 	const stop = serve();
@@ -392,11 +438,11 @@ test("saving visible DeepSeek settings preserves the hidden API version", async 
 	nodes = flatten(section({}));
 	nodes.find((node) => node.type === "button" && node.props.children.includes("save")).props.onClick({ preventDefault() {} });
 	await new Promise(setImmediate);
-	assert.equal(values.deepseekModel, "new-model");
 	assert.equal(values.model, "old-model");
 	assert.equal(values.apiVersion, "custom-protocol-version");
-	assert.equal(mutations.length, 1);
-	assert.equal(mutations[0].ops.some((op) => (op.path[0] === "apiVersion" || op.path[0] === "deepseekApiVersion")), false);
+	const legacy = writes.find((write) => write.ns === "web-search-deepseek");
+	assert.equal(legacy.ops.some((op) => op.op === "set" && op.path[0] === "model" && op.value === "new-model"), true);
+	assert.equal(writes.flatMap((write) => write.ops).some((op) => op.path[0] === "apiVersion" || op.path[0] === "deepseekApiVersion"), false);
 	stop();
 });
 
@@ -428,10 +474,10 @@ for (const { provider, keyInput, refInput, expectedRef } of [
 	{ provider: "serper", keyInput: "ws-serper-key", refInput: "ws-serper-keyref", expectedRef: "NEW_SERPER_KEY" }
 ]) {
 	test(`${provider} saves a key under the staged credential name`, async () => {
-		const writes = [];
-		const { registrations, serve, mutations } = setupClient({
+		const credentialWrites = [];
+		const { registrations, serve, mutations, writes: configWrites } = setupClient({
 			provider,
-			credentialSet: async (ref, value) => { writes.push({ ref, value }); return { ok: true }; }
+			credentialSet: async (ref, value) => { credentialWrites.push({ ref, value }); return { ok: true }; }
 		});
 		const stop = serve();
 		const section = [...registrations][0];
@@ -443,19 +489,21 @@ for (const { provider, keyInput, refInput, expectedRef } of [
 		const save = nodes.find((node) => node.type === "button" && node.props.children.includes("save"));
 		save.props.onClick({ preventDefault() {} });
 		await new Promise(setImmediate);
-		assert.deepEqual(writes, [{ ref: expectedRef, value: "replacement-key" }]);
-		assert.equal(mutations.length, 1);
-		assert.equal(mutations[0].revision, 1);
-		assert.deepEqual(JSON.parse(JSON.stringify(mutations[0].ops.map((op) => [op.op, op.path[0], op.value]))), [
-			["set", provider === "serper" ? "serperApiKeyEnv" : "deepseekApiKeyEnv", expectedRef],
-			["set", provider === "serper" ? "serperApiKey" : "deepseekApiKey", ""]
-		]);
+		assert.deepEqual(credentialWrites, [{ ref: expectedRef, value: "replacement-key" }]);
+		const pluginOps = JSON.parse(JSON.stringify(mutations.flatMap((mutation) => mutation.ops.map((op) => [op.op, op.path[0], op.value]))));
+		if (provider === "deepseek-official") {
+			const legacyOps = JSON.parse(JSON.stringify(configWrites.filter((write) => write.ns === "web-search-deepseek").flatMap((write) => write.ops.map((op) => [op.op, op.path[0], op.value]))));
+			assert.deepEqual(legacyOps, [["set", "apiKeyEnv", expectedRef]]);
+			assert.deepEqual(pluginOps, [["set", "deepseekApiKey", ""]]);
+		} else {
+			assert.deepEqual(pluginOps, [["set", "serperApiKeyEnv", expectedRef], ["set", "serperApiKey", ""]]);
+		}
 		stop();
 	});
 }
 
 test("rejected configuration mutation keeps the draft and reports failure", async () => {
-	const { registrations, serve, mutations } = setupClient({ mutate: async () => false });
+	const { registrations, serve, writes } = setupClient({ scopes: { "web-search-deepseek": { mutate: async () => false } } });
 	const stop = serve();
 	const section = [...registrations][0];
 	let nodes = flatten(section({}));
@@ -464,7 +512,7 @@ test("rejected configuration mutation keeps the draft and reports failure", asyn
 	nodes.find((node) => node.type === "button" && node.props.children.includes("save")).props.onClick({ preventDefault() {} });
 	await new Promise(setImmediate);
 	nodes = flatten(section({}));
-	assert.equal(mutations.length, 1);
+	assert.equal(writes.filter((write) => write.ns === "web-search-deepseek").length, 1);
 	assert.ok(nodes.includes("partialFailed"));
 	assert.ok(nodes.includes("unsaved"));
 	assert.equal(nodes.find((node) => node.props?.id === "ws-model").props.value, "replacement-model");

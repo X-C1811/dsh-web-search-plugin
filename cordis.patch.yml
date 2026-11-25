@@ -3,31 +3,34 @@
 # installs the package as a plain library: no loader row, no Host apply, no
 # `/plugins/<name>/client.js`.
 #
-# `searchProvider` and the upstream `fetchProvider` are restated in full
-# because a Cordis patch replaces the targeted row's whole `config`. The
-# profile's own cordis.patch.yml still wins if it later overrides `web`.
+# `fetchProvider` is restated in full because a Cordis patch replaces the
+# targeted row's whole `config`. The profile's own cordis.patch.yml still wins
+# if it later overrides `web`.
 #
-# Defaults mirror the Harness `0.2.2` defaults: the in-box `deepseek-search-api`
-# provider searches, and `http` fetches from this device. Selecting any engine
-# this bundle serves (legacy Messages, Tavily, Brave, Serper, …) switches
-# `searchProvider` back to `dsh-web-search`, this bundle's own seam id, and
-# leaves the backend to the plugin's `provider` setting.
-#
-# `deepseek-search-api` needs the in-box `web-deepseek-api` layer, which the
-# Harness ships from `0.2.1-rc.2` on. A profile without it must pick another
-# engine on the settings page.
+# `searchProvider` is deliberately left unset. Harness `0.2.2-rc.5` then routes
+# each search by the model request it serves: DeepSeek routes use the in-box
+# `deepseek-official` server-side search (no per-search charge), every other
+# route and searches outside a model request use `deepseek-search-api`. This is
+# the card's "follow the conversation model" default, and it matches the
+# official page. Selecting any engine this bundle serves (server-side search,
+# Tavily, Brave, Serper, …) pins `searchProvider` to `dsh-web-search` and leaves
+# the backend to the plugin's `provider` setting; selecting DeepSeek Search API
+# pins it to `deepseek-search-api`.
 - id: web
   name: '@deepseek-ai/dsh-web'
   config:
-    searchProvider: deepseek-search-api
     fetchProvider: http
 
-# Disable the in-box legacy DeepSeek search plugin so the profile has one
-# active legacy Messages configuration surface: this bundle's `dsh-web-search`
-# provider with its `deepseek-official` backend. That provider id is distinct
-# from the in-box `deepseek-official` one.
-- id: web-search-deepseek
-  disabled: true
+# Keep the in-box DeepSeek search plugin registered: "follow the conversation
+# model" leaves `web.searchProvider` unset, and Harness `0.2.2-rc.5` then routes
+# DeepSeek model requests to this provider (`deepseek-official`) and every other
+# route to `deepseek-search-api`. The card's DeepSeek rows read and write the
+# `web-search-deepseek` namespace directly, and the in-box settings page stays
+# disabled below, so this bundle still owns the only configuration surface.
+#
+# Disabling this row would leave the unset selection with two usable providers
+# (`dsh-web-search` and `deepseek-search-api`) and every search would fail with
+# `WEB_PROVIDER_AMBIGUOUS`.
 
 # Disable the in-box "Web search & fetch" settings page. Its two seams (`web`
 # and `web-deepseek-api`) are exactly what this bundle's own page edits, and

@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "网页搜索与获取",
-    "description": "在一个页面独立配置网页搜索提供方与网页获取：DeepSeek Search API（默认）、旧版 Messages、8 个第三方引擎、本机直接获取和可选 DeepSeek Fetch API。",
+    "description": "在一个页面独立配置网页搜索提供方与网页获取：跟随会话模型（默认）、DeepSeek Search API、DeepSeek 服务端搜索、8 个第三方引擎、本机直接获取和可选 DeepSeek Fetch API。",
     "detail": "assets/detail/zh.md"
   }
 }
