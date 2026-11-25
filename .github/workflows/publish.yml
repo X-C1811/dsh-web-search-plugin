@@ -40,6 +40,37 @@ jobs:
           fi
           echo "Publishing $PKG_VERSION"
 
+      # A prerelease must never take the `latest` dist-tag: `npm install <pkg>`
+      # resolves that tag, so every fresh install would land on a build that is
+      # not ready to be the default. Publish under the prerelease identifier
+      # instead (`-alpha.1` → `alpha`, `-rc.2` → `rc`), which `npm publish`
+      # applies to the version without touching `latest`. A stable version keeps
+      # the default `latest`.
+      - name: Resolve npm dist-tag
+        id: dist_tag
+        run: |
+          PKG_VERSION=$(npm pkg get version | tr -d '"')
+          if [[ "$PKG_VERSION" == *-* ]]; then
+            IDENTIFIER="${PKG_VERSION#*-}"
+            IDENTIFIER="${IDENTIFIER%%.*}"
+            # dist-tags cannot start with a digit, so an unnamed numeric
+            # prerelease falls back to the conventional `next`.
+            if [[ ! "$IDENTIFIER" =~ ^[a-zA-Z] ]]; then
+              IDENTIFIER="next"
+            fi
+            {
+              echo "tag=$IDENTIFIER"
+              echo "prerelease=true"
+            } >> "$GITHUB_OUTPUT"
+            echo "$PKG_VERSION is a prerelease; publishing under dist-tag '$IDENTIFIER' and leaving 'latest' untouched."
+          else
+            {
+              echo "tag=latest"
+              echo "prerelease=false"
+            } >> "$GITHUB_OUTPUT"
+            echo "$PKG_VERSION is a stable release; publishing under dist-tag 'latest'."
+          fi
+
       # Release notes are taken from the matching CHANGELOG section, so the
       # GitHub Release uses the hand-maintained changelog.
       - name: Extract changelog for this version
@@ -57,11 +88,17 @@ jobs:
           cat RELEASE_NOTES.md
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag "${{ steps.dist_tag.outputs.tag }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes-file RELEASE_NOTES.md
+          PRERELEASE: ${{ steps.dist_tag.outputs.prerelease }}
+        run: |
+          FLAGS=()
+          if [ "$PRERELEASE" = "true" ]; then
+            FLAGS+=(--prerelease)
+          fi
+          gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes-file RELEASE_NOTES.md "${FLAGS[@]}"
